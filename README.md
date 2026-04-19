@@ -1,4 +1,4 @@
-# Mugni Finance
+# Finance Management System
 
 Mobile-first family finance app with React, Tailwind CSS v3, Firebase-ready architecture, offline-first flow, and spreadsheet sync via Firebase Cloud Functions.
 
