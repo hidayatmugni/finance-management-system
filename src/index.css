@@ -1,0 +1,182 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: "Manrope", "Segoe UI", sans-serif;
+    color: #f4f7fb;
+    background-color: #0b1118;
+  }
+
+  body {
+    background:
+      radial-gradient(circle at top left, rgba(102, 182, 255, 0.12), transparent 26%),
+      radial-gradient(circle at top right, rgba(91, 140, 255, 0.14), transparent 28%),
+      linear-gradient(180deg, #0b1118 0%, #0f1722 100%);
+    @apply m-0 min-h-screen text-ink antialiased;
+  }
+
+  * {
+    @apply border-line;
+  }
+
+  #root {
+    min-height: 100vh;
+  }
+}
+
+@layer components {
+  .panel-card {
+    @apply rounded-xl2 border border-line bg-panel shadow-card;
+  }
+
+  .section-shell {
+    @apply panel-card p-4;
+  }
+
+  .metric-value {
+    @apply text-[1.15rem] font-extrabold tracking-tight leading-6;
+  }
+
+  .metric-label {
+    @apply text-xs font-medium uppercase tracking-[0.16em] text-muted;
+  }
+
+  .input {
+    @apply h-12 w-full rounded-2xl border border-line bg-white px-4 text-sm text-ink outline-none transition focus:border-primary;
+  }
+
+  .section-shell-compact {
+    @apply panel-card p-3;
+  }
+
+  .input-compact {
+    @apply h-10 w-full rounded-xl2 border border-line bg-white px-3 text-[13px] text-ink outline-none transition focus:border-primary;
+  }
+
+  .app-phone-shell {
+    @apply mx-auto min-h-screen w-full max-w-md;
+  }
+
+  .ant-card.finance-card {
+    box-shadow: 0 18px 38px rgba(0, 0, 0, 0.42);
+    border-color: #233041;
+  }
+
+  .ant-card.finance-soft-card {
+    background: linear-gradient(180deg, #141d29 0%, #101823 100%);
+  }
+
+  .finance-glass {
+    background: rgba(7, 12, 18, 0.74);
+    backdrop-filter: blur(14px);
+  }
+
+  .finance-section {
+    margin-bottom: 16px;
+  }
+
+  .finance-chip {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .finance-chip-income {
+    background: rgba(41, 193, 115, 0.12);
+    color: #29c173;
+  }
+
+  .finance-chip-expense {
+    background: rgba(255, 91, 91, 0.12);
+    color: #ff5b5b;
+  }
+
+  .ant-input,
+  .ant-input-number,
+  .ant-input-number-input,
+  .ant-input-affix-wrapper,
+  .ant-input-outlined,
+  .ant-select-selector,
+  .ant-picker,
+  .ant-radio-button-wrapper,
+  .ant-btn-default {
+    background: #101823 !important;
+    color: #f4f7fb !important;
+    border-color: #233041 !important;
+  }
+
+  .ant-radio-group.finance-type-toggle {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .ant-radio-group.finance-type-toggle .ant-radio-button-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 56px;
+    border-radius: 18px !important;
+    border: 1px solid #233041 !important;
+    background: #101823 !important;
+    color: #d7e0ee !important;
+    font-weight: 700;
+    text-align: center;
+    padding-inline: 12px !important;
+    box-shadow: none !important;
+  }
+
+  .ant-radio-group.finance-type-toggle .ant-radio-button-wrapper::before {
+    display: none !important;
+  }
+
+  .ant-radio-group.finance-type-toggle .ant-radio-button-wrapper-checked {
+    border-color: #5b8cff !important;
+    background: linear-gradient(180deg, rgba(91, 140, 255, 0.9) 0%, rgba(67, 108, 214, 0.95) 100%) !important;
+    color: #ffffff !important;
+    box-shadow: 0 12px 24px rgba(91, 140, 255, 0.24) !important;
+  }
+
+  .ant-radio-group.finance-type-toggle .ant-radio-button-wrapper:not(.ant-radio-button-wrapper-checked):hover {
+    border-color: #3b4d66 !important;
+    color: #ffffff !important;
+  }
+
+  .ant-input::placeholder,
+  .ant-input-number-input::placeholder,
+  .ant-select-selection-placeholder,
+  .ant-input-password input::placeholder,
+  .ant-input-affix-wrapper input::placeholder {
+    color: #6f8197 !important;
+  }
+
+  .ant-card .ant-card-body,
+  .ant-table,
+  .ant-table-container,
+  .ant-table-tbody > tr > td,
+  .ant-table-thead > tr > th,
+  .ant-list-item {
+    color: #e9eef5;
+  }
+
+  .ant-table-thead > tr > th {
+    background: #121b28 !important;
+    border-bottom-color: #233041 !important;
+  }
+
+  .ant-table-tbody > tr > td {
+    background: #121a24 !important;
+    border-bottom-color: #1f2b3b !important;
+  }
+
+  .ant-tag {
+    border-color: transparent !important;
+  }
+}
