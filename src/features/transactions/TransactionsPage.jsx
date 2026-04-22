@@ -5,10 +5,8 @@ import { useFinanceStore } from "../../shared/state/useFinanceStore";
 import { EmptyState } from "../../shared/components/EmptyState";
 import { SectionHeading } from "../../shared/components/SectionHeading";
 import { formatCurrency, formatDate } from "../../shared/utils/format";
-import { getTodayRange, inDateRange } from "../../shared/utils/dateFilters";
-import { getKategoriByJenis, getJenisLabel, JENIS_ARUS_KAS, PILIHAN_JENIS_ARUS_KAS } from "../../shared/config/cashflow";
-
-const todayRange = getTodayRange();
+import { inDateRange } from "../../shared/utils/dateFilters";
+import { getKategoriByJenis, JENIS_ARUS_KAS, PILIHAN_JENIS_ARUS_KAS } from "../../shared/config/cashflow";
 
 export function TransactionsPage() {
   const transactions = useFinanceStore((state) => state.transactions);
@@ -16,8 +14,8 @@ export function TransactionsPage() {
   const filters = useFinanceStore((state) => state.filters);
   const setFilters = useFinanceStore((state) => state.setFilters);
 
-  const startDate = filters.startDate || todayRange.startDate;
-  const endDate = filters.endDate || todayRange.endDate;
+  const startDate = filters.startDate || "";
+  const endDate = filters.endDate || "";
 
   const categoryOptions = useMemo(() => {
     if (filters.type === JENIS_ARUS_KAS.PEMASUKAN) return getKategoriByJenis(JENIS_ARUS_KAS.PEMASUKAN);
@@ -36,7 +34,8 @@ export function TransactionsPage() {
       }),
     [endDate, filters.activeMemberId, filters.categoryId, filters.type, startDate, transactions],
   );
-  const displayTransactions = filteredTransactions.slice(0, 10);
+  const displayTransactions = [...filteredTransactions]
+    .sort((a, b) => dayjs(b.date).valueOf() - dayjs(a.date).valueOf());
 
   const totalPemasukan = filteredTransactions
     .filter((item) => item.type === JENIS_ARUS_KAS.PEMASUKAN)
@@ -58,7 +57,7 @@ export function TransactionsPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2.5">
       <SectionHeading eyebrow="Tabel Harian" title="Ringkasan transaksi yang mudah dibaca" />
 
       <Card className="finance-card finance-soft-card">
@@ -94,7 +93,7 @@ export function TransactionsPage() {
             </div>
           </Field>
 
-          <div className="mt-3 grid grid-cols-3 gap-3">
+          <div className="mt-2 grid grid-cols-3 gap-2">
             <Field label="Jenis">
               <Select
                 value={filters.type}
@@ -142,7 +141,7 @@ export function TransactionsPage() {
         </Form>
       </Card>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-2">
         <SummaryCard label="Total pemasukan" value={formatCurrency(totalPemasukan)} />
         <SummaryCard label="Total pengeluaran" value={formatCurrency(totalPengeluaran)} />
       </div>
@@ -150,25 +149,34 @@ export function TransactionsPage() {
       <Card className="finance-card" styles={{ body: { padding: 0, overflow: "hidden" } }}>
         <Table
           size="small"
+          tableLayout="fixed"
           rowKey="id"
-          pagination={false}
-          scroll={{ x: 760, y: 420 }}
+          pagination={{
+            pageSize: 15,
+            size: "small",
+            showSizeChanger: false
+          }}
+          scroll={{ y: 560 }}
           dataSource={displayTransactions}
           locale={{ emptyText: "Tidak ada data pada filter yang dipilih." }}
           columns={[
             {
               title: "Tanggal",
               dataIndex: "date",
-              width: 110,
-              render: (value) => formatDate(value)
+              width: 76,
+              render: (value) => (
+                <Typography.Text className="!text-[11px] !text-muted">
+                  {formatDate(value, "DD/MM/YY")}
+                </Typography.Text>
+              )
             },
             {
               title: "Nominal",
               dataIndex: "amount",
-              width: 130,
+              width: 98,
               align: "right",
               render: (value, item) => (
-                <Typography.Text strong className={item.type === JENIS_ARUS_KAS.PEMASUKAN ? "!text-income" : "!text-expense"}>
+                <Typography.Text className={`!text-[11px] !font-medium ${item.type === JENIS_ARUS_KAS.PEMASUKAN ? "!text-income" : "!text-expense"}`}>
                   {formatCurrency(value)}
                 </Typography.Text>
               )
@@ -176,23 +184,22 @@ export function TransactionsPage() {
             {
               title: "User",
               dataIndex: "memberName",
-              width: 120,
-              render: (value) => truncateText(value, 16)
-            },
-            {
-              title: "Jenis",
-              dataIndex: "type",
-              width: 110,
+              width: 84,
               render: (value) => (
-                <Tag className={value === JENIS_ARUS_KAS.PEMASUKAN ? "finance-chip finance-chip-income" : "finance-chip finance-chip-expense"}>
-                  {getJenisLabel(value)}
-                </Tag>
+                <Typography.Text className="!text-[11px] !text-ink">
+                  {truncateText(value, 10)}
+                </Typography.Text>
               )
             },
             {
               title: "Kategori",
               dataIndex: "categoryName",
-              width: 120
+              width: 92,
+              render: (value) => (
+                <Typography.Text className="!text-[11px] !text-ink">
+                  {truncateText(value, 11)}
+                </Typography.Text>
+              )
             },
             
           ]}

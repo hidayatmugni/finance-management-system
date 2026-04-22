@@ -18,6 +18,15 @@ export function formatCompactCurrency(value) {
   }).format(value || 0);
 }
 
+export function formatAxisCurrency(value) {
+  const compact = new Intl.NumberFormat("id-ID", {
+    notation: "compact",
+    maximumFractionDigits: 1
+  }).format(value || 0);
+
+  return compact.replace(" ", " ");
+}
+
 export function formatDate(value, pattern = "DD MMM YYYY") {
   return dayjs(value).format(pattern);
 }

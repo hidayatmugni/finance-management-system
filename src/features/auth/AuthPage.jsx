@@ -1,6 +1,6 @@
 import { LockOutlined, MailOutlined } from "@ant-design/icons";
 import { Alert, Button, Card, Input, Space, Typography } from "antd";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthProvider";
 import { Controller, useForm } from "react-hook-form";
@@ -9,6 +9,12 @@ export function AuthPage() {
   const navigate = useNavigate();
   const { login, isFirebaseReady } = useAuth();
   const [submitAlert, setSubmitAlert] = useState(null);
+
+  useEffect(() => {
+    if (!submitAlert) return undefined;
+    const timeoutId = window.setTimeout(() => setSubmitAlert(null), 2000);
+    return () => window.clearTimeout(timeoutId);
+  }, [submitAlert]);
 
   const {
     control,

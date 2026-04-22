@@ -33,6 +33,12 @@ export function AddTransactionPage() {
   const { user } = useAuth();
   const [submitAlert, setSubmitAlert] = useState(null);
 
+  useEffect(() => {
+    if (!submitAlert) return undefined;
+    const timeoutId = window.setTimeout(() => setSubmitAlert(null), 2000);
+    return () => window.clearTimeout(timeoutId);
+  }, [submitAlert]);
+
   const {
     register,
     control,
@@ -55,7 +61,9 @@ export function AddTransactionPage() {
 
   const selectedType = watch("type");
   const selectedCategoryId = watch("categoryId");
+  const selectedUserId = watch("userId");
   const availableCategories = getKategoriByJenis(selectedType);
+  const selectedMember = members.find((member) => member.id === selectedUserId);
 
   useEffect(() => {
     if (user?.uid && members.some((member) => member.id === user.uid)) {
@@ -154,13 +162,13 @@ export function AddTransactionPage() {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2.5">
       <Card className="finance-card finance-soft-card">
-        <Space orientation="vertical" size={6} className="w-full">
+        <Space orientation="vertical" size={4} className="w-full">
           <Typography.Text className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
             Input Harian
           </Typography.Text>
-          <Typography.Title level={3} className="!m-0 !text-lg !font-extrabold">
+          <Typography.Title level={3} className="!m-0 !text-base !font-bold">
             Input pemasukan dan pengeluaran dengan cepat
           </Typography.Title>
           <Typography.Paragraph className="!m-0 !text-xs !leading-5 !text-muted">
@@ -168,7 +176,7 @@ export function AddTransactionPage() {
           </Typography.Paragraph>
         </Space>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="mt-4 space-y-3">
+        <form onSubmit={handleSubmit(onSubmit)} className="mt-3 space-y-2.5">
           {submitAlert ? (
             <Alert
               type={submitAlert.type}
@@ -261,19 +269,10 @@ export function AddTransactionPage() {
               </Field>
 
               <Field label="Diinput oleh">
-                <Controller
-                  name="userId"
-                  control={control}
-                  render={({ field }) => (
-                    <Select
-                      {...field}
-                      size="large"
-                      options={members.map((member) => ({
-                        value: member.id,
-                        label: member.fullName || member.name
-                      }))}
-                    />
-                  )}
+                <Input
+                  size="large"
+                  readOnly
+                  value={selectedMember?.fullName || selectedMember?.name || user?.displayName || user?.email || "-"}
                 />
               </Field>
             </div>
@@ -281,7 +280,7 @@ export function AddTransactionPage() {
 
           <Card size="small" className="finance-soft-card">
             <Typography.Text className="text-xs uppercase tracking-[0.16em] text-muted">Ringkasan</Typography.Text>
-            <Typography.Text className="mt-1 block text-sm font-semibold text-ink">
+            <Typography.Text className="mt-1 block text-[13px] font-semibold text-ink">
               {getJenisLabel(selectedType)} - {getKategoriName(selectedCategoryId)}
             </Typography.Text>
           </Card>

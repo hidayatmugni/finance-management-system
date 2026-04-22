@@ -24,6 +24,12 @@ export function SettingsPage() {
     setFamilyName(family?.name || "");
   }, [family?.name]);
 
+  useEffect(() => {
+    if (!submitAlert) return undefined;
+    const timeoutId = window.setTimeout(() => setSubmitAlert(null), 2000);
+    return () => window.clearTimeout(timeoutId);
+  }, [submitAlert]);
+
   const items = [
     { title: "Target Tabungan", description: "Target dan progres tabungan", to: "/savings" },
     { title: "Hutang & Piutang", description: "Hutang, piutang, dan riwayat pembayaran", to: "/debts" },
