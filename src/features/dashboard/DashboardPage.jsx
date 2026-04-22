@@ -7,8 +7,10 @@ import { Card, Typography } from "antd";
 import { Link } from "react-router-dom";
 import {
   Bar,
-  BarChart,
   CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -20,7 +22,7 @@ import { MetricCard } from "../../shared/components/MetricCard";
 import { TransactionList } from "../../shared/components/TransactionList";
 import { SimpleBarList } from "../../shared/components/SimpleBarList";
 import { EmptyState } from "../../shared/components/EmptyState";
-import { formatCurrency } from "../../shared/utils/format";
+import { formatAxisCurrency, formatCurrency } from "../../shared/utils/format";
 import {
   buildCategoryBreakdown,
   buildFinanceSummary,
@@ -84,14 +86,50 @@ export function DashboardPage() {
         <SectionHeading eyebrow="Tren" title="Perbandingan bulanan" />
         <div className="mt-4 h-64">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={monthlyTrend}>
-              <CartesianGrid vertical={false} stroke="#ead9dc" />
-              <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={12} />
-              <YAxis hide />
+            <LineChart data={monthlyTrend} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+              <CartesianGrid vertical={false} stroke="#232325" strokeDasharray="3 3" />
+              <XAxis
+                dataKey="month"
+                tickLine={false}
+                axisLine={false}
+                tick={{ fill: "#8e949e", fontSize: 11 }}
+              />
+              <YAxis
+                width={44}
+                tickLine={false}
+                axisLine={false}
+                tick={{ fill: "#8e949e", fontSize: 11 }}
+                tickFormatter={formatAxisCurrency}
+              />
               <Tooltip formatter={(value) => formatCurrency(value)} />
-              <Bar dataKey="income" fill="#2f8f57" radius={[8, 8, 0, 0]} />
-              <Bar dataKey="expense" fill="#cf4b4b" radius={[8, 8, 0, 0]} />
-            </BarChart>
+              <Legend
+                verticalAlign="top"
+                height={24}
+                formatter={(value) => (
+                  <span style={{ color: "#cfd6de", fontSize: 11, fontWeight: 600 }}>
+                    {value === "income" ? "Pemasukan" : "Pengeluaran"}
+                  </span>
+                )}
+              />
+              <Line
+                type="monotone"
+                dataKey="income"
+                stroke="#19c06c"
+                strokeWidth={2.5}
+                dot={{ r: 2.5, strokeWidth: 0, fill: "#19c06c" }}
+                activeDot={{ r: 4 }}
+                name="income"
+              />
+              <Line
+                type="monotone"
+                dataKey="expense"
+                stroke="#f04452"
+                strokeWidth={2.5}
+                dot={{ r: 2.5, strokeWidth: 0, fill: "#f04452" }}
+                activeDot={{ r: 4 }}
+                name="expense"
+              />
+            </LineChart>
           </ResponsiveContainer>
         </div>
       </Card>
@@ -130,13 +168,13 @@ export function DashboardPage() {
 
 function ShortcutCard({ title, icon, to }) {
   return (
-    <Link to={to}>
-      <Card className="finance-card finance-soft-card !h-full !text-center" styles={{ body: { padding: 12 } }}>
+    <Link to={to} className="block !no-underline">
+      <Card className="finance-card finance-soft-card !h-full !border-[#2a2a2c] !text-center" styles={{ body: { padding: 12 } }}>
         <div className="flex min-h-[78px] flex-col items-center justify-center text-center">
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-base font-extrabold text-primary">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#163326] text-base font-extrabold text-[#19c06c]">
             {icon}
           </span>
-          <Typography.Text className="mt-2 !text-[11px] !font-bold">{title}</Typography.Text>
+          <Typography.Text className="mt-2 !text-[11px] !font-semibold !text-ink">{title}</Typography.Text>
         </div>
       </Card>
     </Link>

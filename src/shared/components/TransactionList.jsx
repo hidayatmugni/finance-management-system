@@ -13,19 +13,19 @@ export function TransactionList({ items }) {
             }`}
           >
             <div className="min-w-0">
-              <Typography.Text strong className="block !text-sm">
+              <Typography.Text strong className="block !text-[13px] !font-semibold">
                 {truncateText(item.title, 34)}
               </Typography.Text>
-              <Typography.Text className="mt-1 block !text-xs !text-muted">
+              <Typography.Text className="mt-1 block !text-[11px] !text-muted">
                 {item.memberName} | {item.categoryName} | {formatDate(item.date)}
               </Typography.Text>
-              <Tag className="mt-2 rounded-full border-0 bg-white/10 px-2 py-[2px] text-[10px] font-semibold text-muted">
+              <Tag className="mt-2 rounded-full border-0 bg-[#202022] px-2 py-[2px] text-[10px] font-medium text-muted">
                 {translateSyncStatus(item.syncStatus)}
               </Tag>
             </div>
             <Typography.Text
               strong
-              className={item.type === "income" ? "!text-income" : "!text-expense"}
+              className={item.type === "income" ? "!text-[13px] !text-income" : "!text-[13px] !text-expense"}
             >
               {item.type === "income" ? "+" : "-"}
               {formatCurrency(item.amount)}

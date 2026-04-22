@@ -124,13 +124,13 @@ export function AppShell() {
         <Card variant="borderless" className="finance-card !mb-0">
           <div className="flex items-start justify-between gap-3">
             <Space orientation="vertical" size={2}>
-              <Typography.Text className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">
-                Catatan Keuangan Harian
+              <Typography.Text className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted">
+                Trading Finance
               </Typography.Text>
-              <Typography.Title level={3} className="!m-0 !text-[1.05rem] !font-extrabold">
+              <Typography.Title level={3} className="!m-0 !text-[1rem] !font-bold">
                 My Finance
               </Typography.Title>
-              <Typography.Text className="!text-[13px] !text-ink">
+              <Typography.Text className="!text-[12px] !font-medium !text-ink">
                 {profile?.fullName || user?.displayName || user?.email || "Sudah masuk"}
               </Typography.Text>
               <Typography.Text className="!text-[11px] !text-muted">
@@ -139,15 +139,15 @@ export function AppShell() {
             </Space>
 
             <Space orientation="vertical" size={6} className="min-w-[94px]">
-              <Badge count={pendingSyncCount} color="#8a3345" overflowCount={99}>
-                <Card size="small" className="finance-soft-card !rounded-xl" styles={{ body: { padding: 10 } }}>
+              <Badge count={pendingSyncCount} color="#16b364" overflowCount={99}>
+                <Card size="small" className="finance-soft-card !rounded-[10px]" styles={{ body: { padding: 10 } }}>
                   <Space size={5}>
                     <CloudSyncOutlined className="text-[13px] text-primary" />
-                    <Typography.Text className="!text-[11px] !font-semibold">Sinkron</Typography.Text>
+                    <Typography.Text className="!text-[11px] !font-medium">Sinkron</Typography.Text>
                   </Space>
                 </Card>
               </Badge>
-              <Button icon={<LogoutOutlined />} onClick={() => logout()} size="small" block>
+              <Button icon={<LogoutOutlined />} onClick={() => logout()} size="small" block className="!font-medium">
                 Keluar
               </Button>
             </Space>
@@ -164,15 +164,15 @@ export function AppShell() {
           <ul className="grid grid-cols-5 gap-1.5">
             {bottomNavItems.map((item) => (
               <li key={item.to}>
-                <NavLink to={item.to}>
+                <NavLink to={item.to} className="block !no-underline">
                   {({ isActive }) => (
                     <div
-                      className={`flex min-h-[52px] flex-col items-center justify-center rounded-xl px-1.5 py-1.5 text-center transition ${
-                        isActive ? "bg-primary text-white shadow-md" : "bg-[#141d29] text-muted"
+                      className={`flex min-h-[50px] flex-col items-center justify-center rounded-[10px] border px-1.5 py-1.5 text-center transition ${
+                        isActive ? "border-[#148a54] bg-[#163326] text-[#19c06c]" : "border-line bg-[#18181a] text-muted"
                       }`}
                     >
                       <span className="text-[15px]">{navIconMap[item.to] || <HomeOutlined />}</span>
-                      <span className="mt-1 text-[10px] font-semibold leading-none">{item.label}</span>
+                      <span className="mt-1 text-[10px] font-medium leading-none">{item.label}</span>
                     </div>
                   )}
                 </NavLink>

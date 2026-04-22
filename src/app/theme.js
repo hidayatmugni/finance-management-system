@@ -3,72 +3,72 @@ import { theme as antdTheme } from "antd";
 export const appTheme = {
   algorithm: antdTheme.darkAlgorithm,
   token: {
-    colorPrimary: "#5b8cff",
-    colorSuccess: "#29c173",
-    colorWarning: "#d7a237",
-    colorError: "#ff5b5b",
-    colorInfo: "#66b6ff",
-    colorTextBase: "#f4f7fb",
-    colorBgBase: "#0b1118",
-    colorBgLayout: "#0b1118",
-    colorBgContainer: "#121a24",
-    colorBorder: "#233041",
-    colorSplit: "#1c2634",
-    colorTextSecondary: "#95a4b8",
-    fontFamily: "\"Manrope\", \"Segoe UI\", sans-serif",
-    borderRadius: 20,
-    borderRadiusLG: 24,
-    borderRadiusSM: 14,
-    boxShadowSecondary: "0 18px 38px rgba(0, 0, 0, 0.42)"
+    colorPrimary: "#16b364",
+    colorSuccess: "#16b364",
+    colorWarning: "#f5b546",
+    colorError: "#f04452",
+    colorInfo: "#1f8a56",
+    colorTextBase: "#f1f5f9",
+    colorBgBase: "#0f0f10",
+    colorBgLayout: "#0f0f10",
+    colorBgContainer: "#171717",
+    colorBorder: "#2a2a2c",
+    colorSplit: "#232325",
+    colorTextSecondary: "#8e949e",
+    fontFamily: "\"IBM Plex Sans\", \"Segoe UI\", sans-serif",
+    borderRadius: 14,
+    borderRadiusLG: 16,
+    borderRadiusSM: 10,
+    boxShadowSecondary: "0 12px 28px rgba(0, 0, 0, 0.34)"
   },
   components: {
     Layout: {
-      headerBg: "rgba(9, 15, 22, 0.84)",
-      bodyBg: "#0b1118",
-      footerBg: "rgba(10, 16, 24, 0.92)"
+      headerBg: "rgba(16, 16, 17, 0.92)",
+      bodyBg: "#0f0f10",
+      footerBg: "rgba(16, 16, 17, 0.96)"
     },
     Card: {
-      bodyPadding: 18,
-      headerFontSize: 16,
-      headerHeight: 44
+      bodyPadding: 12,
+      headerFontSize: 14,
+      headerHeight: 40
     },
     Button: {
-      controlHeight: 44,
-      borderRadius: 16
+      controlHeight: 38,
+      borderRadius: 10
     },
     Input: {
-      controlHeight: 44
+      controlHeight: 38
     },
     Select: {
-      controlHeight: 44
+      controlHeight: 38
     },
     Table: {
-      headerBg: "#121b28",
-      headerColor: "#e8edf5",
-      rowHoverBg: "#131f2d"
+      headerBg: "#1b1b1d",
+      headerColor: "#dfe5ec",
+      rowHoverBg: "#1a1a1c"
     },
     Segmented: {
-      trackBg: "#162130"
+      trackBg: "#1b1b1d"
     },
     Tabs: {
-      itemColor: "#95a4b8",
-      itemSelectedColor: "#7da7ff",
-      itemHoverColor: "#7da7ff",
-      inkBarColor: "#7da7ff"
+      itemColor: "#8e949e",
+      itemSelectedColor: "#16b364",
+      itemHoverColor: "#16b364",
+      inkBarColor: "#16b364"
     },
     Input: {
-      activeBorderColor: "#5b8cff",
-      hoverBorderColor: "#5b8cff"
+      activeBorderColor: "#16b364",
+      hoverBorderColor: "#16b364"
     },
     Select: {
-      activeBorderColor: "#5b8cff",
-      hoverBorderColor: "#5b8cff"
+      activeBorderColor: "#16b364",
+      hoverBorderColor: "#16b364"
     },
     Radio: {
-      buttonSolidCheckedBg: "#5b8cff",
-      buttonSolidCheckedHoverBg: "#6b98ff",
-      buttonCheckedBg: "#5b8cff",
-      buttonCheckedHoverBg: "#6b98ff",
+      buttonSolidCheckedBg: "#16b364",
+      buttonSolidCheckedHoverBg: "#19c06c",
+      buttonCheckedBg: "#16b364",
+      buttonCheckedHoverBg: "#19c06c",
       buttonColor: "#f4f7fb"
     }
   }

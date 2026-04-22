@@ -3,11 +3,11 @@ import { formatCurrency } from "../utils/format";
 
 export function MetricCard({ label, value, tone = "default", helper }) {
   const toneColorMap = {
-    default: "#dbdbdb",
-    income: "#41ca7a",
-    expense: "#ca4242",
-    savings: "#4da3ff",
-    warning: "#d7a237"
+    default: "#f1f5f9",
+    income: "#19c06c",
+    expense: "#f04452",
+    savings: "#2f8fff",
+    warning: "#f5b546"
   };
 
   return (
@@ -19,13 +19,13 @@ export function MetricCard({ label, value, tone = "default", helper }) {
           styles={{
             content: {
               color: toneColorMap[tone],
-              fontSize: "1.15rem",
-              fontWeight: 800,
-              lineHeight: 1.3
+              fontSize: "1rem",
+              fontWeight: 700,
+              lineHeight: 1.2
             }
           }}
         />
-        {helper ? <Typography.Text className="text-xs text-muted">{helper}</Typography.Text> : null}
+        {helper ? <Typography.Text className="text-[11px] text-muted">{helper}</Typography.Text> : null}
       </Space>
     </Card>
   );

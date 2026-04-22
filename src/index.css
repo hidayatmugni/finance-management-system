@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -6,16 +6,15 @@
 
 @layer base {
   html {
-    font-family: "Manrope", "Segoe UI", sans-serif;
-    color: #f4f7fb;
-    background-color: #0b1118;
+    font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+    color: #f1f5f9;
+    background-color: #0f0f10;
   }
 
   body {
     background:
-      radial-gradient(circle at top left, rgba(102, 182, 255, 0.12), transparent 26%),
-      radial-gradient(circle at top right, rgba(91, 140, 255, 0.14), transparent 28%),
-      linear-gradient(180deg, #0b1118 0%, #0f1722 100%);
+      radial-gradient(circle at top left, rgba(22, 179, 100, 0.08), transparent 22%),
+      linear-gradient(180deg, #101011 0%, #131314 100%);
     @apply m-0 min-h-screen text-ink antialiased;
   }
 
@@ -38,11 +37,11 @@
   }
 
   .metric-value {
-    @apply text-[1.15rem] font-extrabold tracking-tight leading-6;
+    @apply text-[1rem] font-bold tracking-tight leading-5;
   }
 
   .metric-label {
-    @apply text-xs font-medium uppercase tracking-[0.16em] text-muted;
+    @apply text-[11px] font-medium uppercase tracking-[0.14em] text-muted;
   }
 
   .input {
@@ -62,17 +61,19 @@
   }
 
   .ant-card.finance-card {
-    box-shadow: 0 18px 38px rgba(0, 0, 0, 0.42);
-    border-color: #233041;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
+    border-color: #2a2a2c;
+    background: #171717;
   }
 
   .ant-card.finance-soft-card {
-    background: linear-gradient(180deg, #141d29 0%, #101823 100%);
+    background: linear-gradient(180deg, #1a1a1b 0%, #151516 100%);
   }
 
   .finance-glass {
-    background: rgba(7, 12, 18, 0.74);
-    backdrop-filter: blur(14px);
+    background: rgba(13, 13, 14, 0.92);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid #232325;
   }
 
   .finance-section {
@@ -89,13 +90,13 @@
   }
 
   .finance-chip-income {
-    background: rgba(41, 193, 115, 0.12);
-    color: #29c173;
+    background: rgba(22, 179, 100, 0.14);
+    color: #19c06c;
   }
 
   .finance-chip-expense {
-    background: rgba(255, 91, 91, 0.12);
-    color: #ff5b5b;
+    background: rgba(240, 68, 82, 0.14);
+    color: #f04452;
   }
 
   .ant-input,
@@ -107,30 +108,31 @@
   .ant-picker,
   .ant-radio-button-wrapper,
   .ant-btn-default {
-    background: #101823 !important;
-    color: #f4f7fb !important;
-    border-color: #233041 !important;
+    background: #18181a !important;
+    color: #f1f5f9 !important;
+    border-color: #2a2a2c !important;
   }
 
   .ant-radio-group.finance-type-toggle {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
+    gap: 6px;
   }
 
   .ant-radio-group.finance-type-toggle .ant-radio-button-wrapper {
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 56px;
-    border-radius: 18px !important;
+    min-height: 48px;
+    border-radius: 14px !important;
     border: 1px solid #233041 !important;
     background: #101823 !important;
-    color: #d7e0ee !important;
+    color: #cfd6de !important;
     font-weight: 700;
     text-align: center;
-    padding-inline: 12px !important;
+    padding-inline: 10px !important;
     box-shadow: none !important;
+    font-size: 13px !important;
   }
 
   .ant-radio-group.finance-type-toggle .ant-radio-button-wrapper::before {
@@ -138,14 +140,14 @@
   }
 
   .ant-radio-group.finance-type-toggle .ant-radio-button-wrapper-checked {
-    border-color: #5b8cff !important;
-    background: linear-gradient(180deg, rgba(91, 140, 255, 0.9) 0%, rgba(67, 108, 214, 0.95) 100%) !important;
+    border-color: #128652 !important;
+    background: #148a54 !important;
     color: #ffffff !important;
-    box-shadow: 0 12px 24px rgba(91, 140, 255, 0.24) !important;
+    box-shadow: none !important;
   }
 
   .ant-radio-group.finance-type-toggle .ant-radio-button-wrapper:not(.ant-radio-button-wrapper-checked):hover {
-    border-color: #3b4d66 !important;
+    border-color: #3a3a3d !important;
     color: #ffffff !important;
   }
 
@@ -154,7 +156,7 @@
   .ant-select-selection-placeholder,
   .ant-input-password input::placeholder,
   .ant-input-affix-wrapper input::placeholder {
-    color: #6f8197 !important;
+    color: #72767d !important;
   }
 
   .ant-card .ant-card-body,
@@ -163,20 +165,46 @@
   .ant-table-tbody > tr > td,
   .ant-table-thead > tr > th,
   .ant-list-item {
-    color: #e9eef5;
+    color: #edf2f7;
   }
 
   .ant-table-thead > tr > th {
-    background: #121b28 !important;
-    border-bottom-color: #233041 !important;
+    background: #1b1b1d !important;
+    border-bottom-color: #2a2a2c !important;
+    font-size: 12px !important;
   }
 
   .ant-table-tbody > tr > td {
-    background: #121a24 !important;
-    border-bottom-color: #1f2b3b !important;
+    background: #171717 !important;
+    border-bottom-color: #232325 !important;
+    font-size: 12px !important;
   }
 
   .ant-tag {
     border-color: transparent !important;
+  }
+
+  .ant-btn-primary {
+    box-shadow: none !important;
+    font-weight: 700;
+  }
+
+  .ant-progress-inner {
+    background-color: #242426 !important;
+  }
+
+  .ant-form-item {
+    margin-bottom: 10px !important;
+  }
+
+  .ant-progress-text {
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    color: #d8dee6 !important;
+  }
+
+  .ant-typography,
+  .ant-typography strong {
+    letter-spacing: -0.01em;
   }
 }

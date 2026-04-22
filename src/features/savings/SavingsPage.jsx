@@ -1,6 +1,6 @@
 import dayjs from "dayjs";
-import { useMemo, useState } from "react";
-import { Alert, Button, Card, DatePicker, Input, InputNumber, Progress, Select, Space, Tag, Typography } from "antd";
+import { useEffect, useMemo, useState } from "react";
+import { Alert, Button, Card, DatePicker, Input, InputNumber, Modal, Progress, Select, Space, Table, Tag, Typography } from "antd";
 import { EmptyState } from "../../shared/components/EmptyState";
 import { SectionHeading } from "../../shared/components/SectionHeading";
 import { formatCurrency, formatDate } from "../../shared/utils/format";
@@ -28,6 +28,19 @@ export function SavingsPage() {
   const [contributionNote, setContributionNote] = useState("");
   const [goalAlert, setGoalAlert] = useState(null);
   const [contributionAlert, setContributionAlert] = useState(null);
+  const [selectedGoal, setSelectedGoal] = useState(null);
+
+  useEffect(() => {
+    if (!goalAlert) return undefined;
+    const timeoutId = window.setTimeout(() => setGoalAlert(null), 2000);
+    return () => window.clearTimeout(timeoutId);
+  }, [goalAlert]);
+
+  useEffect(() => {
+    if (!contributionAlert) return undefined;
+    const timeoutId = window.setTimeout(() => setContributionAlert(null), 2000);
+    return () => window.clearTimeout(timeoutId);
+  }, [contributionAlert]);
 
   const memberName = useMemo(() => {
     const member = members.find((item) => item.id === user?.uid);
@@ -140,11 +153,11 @@ export function SavingsPage() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2.5">
       <SectionHeading eyebrow="Tabungan" title="Target dan histori setoran tabungan" />
 
       <Card className="finance-card finance-soft-card">
-        <Space orientation="vertical" size={12} className="w-full">
+        <Space orientation="vertical" size={10} className="w-full">
           <Typography.Title level={4} className="!m-0 !text-sm !font-bold">
             Buat target tabungan
           </Typography.Title>
@@ -157,7 +170,7 @@ export function SavingsPage() {
             />
           ) : null}
           <Input value={name} onChange={(event) => setName(event.target.value)} size="large" placeholder="Contoh: Dana darurat" />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-2">
             <InputNumber
               value={targetAmount || null}
               onChange={(value) => setTargetAmount(String(value || ""))}
@@ -182,7 +195,7 @@ export function SavingsPage() {
       </Card>
 
       <Card className="finance-card finance-soft-card">
-        <Space orientation="vertical" size={12} className="w-full">
+        <Space orientation="vertical" size={10} className="w-full">
           <Typography.Title level={4} className="!m-0 !text-sm !font-bold">
             Input setoran tabungan
           </Typography.Title>
@@ -201,7 +214,7 @@ export function SavingsPage() {
             placeholder="Pilih target tabungan"
             options={savingsGoals.map((goal) => ({ value: goal.id, label: goal.name }))}
           />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-2">
             <InputNumber
               value={contributionAmount || null}
               onChange={(value) => setContributionAmount(String(value || ""))}
@@ -238,70 +251,175 @@ export function SavingsPage() {
         />
       ) : null}
 
-      {savingsGoals.map((goal) => {
-        const progress = Math.min((Number(goal.currentAmount || 0) / Number(goal.targetAmount || 1)) * 100, 100);
-        const goalContributions = savingContributions.filter((item) => item.savingGoalId === goal.id);
-
-        return (
-          <Card key={goal.id} className="finance-card">
-            <Space orientation="vertical" size={16} className="w-full">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <Typography.Title level={4} className="!mb-0 !text-base">
-                    {goal.name}
-                  </Typography.Title>
-                  <Typography.Text className="mt-1 block !text-sm !text-muted">
-                    Target selesai {formatDate(goal.targetDate)}
+      {savingsGoals.length ? (
+        <Card className="finance-card" styles={{ body: { padding: 0, overflow: "hidden" } }}>
+          <Table
+            size="small"
+            rowKey="id"
+            pagination={false}
+            dataSource={savingsGoals}
+            scroll={{ x: 420, y: 430 }}
+            onRow={(record) => ({
+              onClick: () => setSelectedGoal(record)
+            })}
+            columns={[
+              {
+                title: "Tabungan",
+                dataIndex: "name",
+                render: (value, item) => (
+                  <div>
+                    <Typography.Text strong className="!text-[13px] !font-semibold">
+                      {value}
+                    </Typography.Text>
+                    <Typography.Text className={`block !text-[11px] !font-medium ${getSavingStatusTextClass(item.status)}`}>
+                      {getSavingStatusLabel(item.status)}
+                    </Typography.Text>
+                  </div>
+                )
+              },
+              {
+                title: "Progress",
+                key: "progress",
+                width: 120,
+                render: (_, item) => {
+                  const progress = Math.min((Number(item.currentAmount || 0) / Number(item.targetAmount || 1)) * 100, 100);
+                  return (
+                    <Typography.Text className="!text-[12px] !font-medium !text-ink">
+                      {Math.round(progress)}%
+                    </Typography.Text>
+                  );
+                }
+              },
+              {
+                title: "Target",
+                dataIndex: "targetAmount",
+                width: 140,
+                align: "right",
+                render: (value) => (
+                  <Typography.Text className="!text-[12px] !font-medium !text-muted">
+                    {formatCurrency(value)}
                   </Typography.Text>
-                </div>
-                <Tag className="rounded-full border-0 bg-white/10 px-3 py-1 text-xs font-semibold text-muted">
-                  {goal.status === "completed" ? "Selesai" : "Aktif"}
-                </Tag>
-              </div>
+                )
+              }
+            ]}
+          />
+        </Card>
+      ) : null}
 
-              <div className="grid grid-cols-2 gap-3">
-                <Card size="small" className="finance-soft-card">
-                  <Typography.Text className="metric-label">Terkumpul</Typography.Text>
-                  <Typography.Text className="mt-2 block text-base font-extrabold text-savings">
-                    {formatCurrency(goal.currentAmount)}
-                  </Typography.Text>
-                </Card>
-                <Card size="small" className="finance-soft-card">
-                  <Typography.Text className="metric-label">Target</Typography.Text>
-                  <Typography.Text className="mt-2 block text-base font-extrabold text-ink">
-                    {formatCurrency(goal.targetAmount)}
-                  </Typography.Text>
-                </Card>
-              </div>
-
-              <Progress percent={progress} showInfo={false} strokeColor="#4da3ff" railColor="#1b2532" />
-
-              <div>
-                <Typography.Text className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
-                  Riwayat setoran
-                </Typography.Text>
-                <Space orientation="vertical" size={12} className="mt-3 w-full">
-                  {goalContributions.length ? (
-                    goalContributions.map((item) => (
-                      <Card key={item.id} size="small" className="finance-soft-card">
-                        <div className="flex items-center justify-between gap-3">
-                          <Typography.Text strong className="!text-sm">{formatCurrency(item.amount)}</Typography.Text>
-                          <Typography.Text className="!text-xs !text-muted">{formatDate(item.date)}</Typography.Text>
-                        </div>
-                        <Typography.Text className="mt-2 block !text-sm !text-muted">
-                          {item.note || "Setoran tabungan"}
-                        </Typography.Text>
-                      </Card>
-                    ))
-                  ) : (
-                    <Alert type="info" showIcon title="Belum ada setoran pada target ini." />
-                  )}
-                </Space>
-              </div>
-            </Space>
-          </Card>
-        );
-      })}
+      <SavingDetailModal
+        goal={selectedGoal}
+        contributions={savingContributions.filter((item) => item.savingGoalId === selectedGoal?.id)}
+        onClose={() => setSelectedGoal(null)}
+      />
     </div>
   );
+}
+
+function SavingDetailModal({ goal, contributions, onClose }) {
+  const open = Boolean(goal);
+  const progress = goal
+    ? Math.min((Number(goal.currentAmount || 0) / Number(goal.targetAmount || 1)) * 100, 100)
+    : 0;
+
+  return (
+    <Modal
+      open={open}
+      onCancel={onClose}
+      footer={null}
+      title={null}
+      centered
+      width={420}
+      styles={{ content: { background: "#171717", padding: 16 }, body: { padding: 0 } }}
+    >
+      {goal ? (
+        <Space orientation="vertical" size={12} className="w-full">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <Typography.Title level={4} className="!mb-0 !text-[15px]">
+                {goal.name}
+              </Typography.Title>
+              <Typography.Text className="mt-1 block !text-[12px] !text-muted">
+                Target selesai {formatDate(goal.targetDate)}
+              </Typography.Text>
+            </div>
+            <Tag className={`rounded-full border-0 px-3 py-1 text-xs font-semibold ${getSavingStatusTagClass(goal.status)}`}>
+              {getSavingStatusLabel(goal.status)}
+            </Tag>
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-3">
+              <Typography.Text className="text-[11px] font-medium text-muted">
+                Terkumpul {formatCurrency(goal.currentAmount || 0)} dari {formatCurrency(goal.targetAmount || 0)}
+              </Typography.Text>
+            </div>
+            <Progress percent={Math.round(progress)} strokeColor="#148a54" railColor="#242426" />
+          </div>
+
+          <div>
+            <Typography.Text className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
+              Riwayat setoran
+            </Typography.Text>
+            <div className="mt-2.5 max-h-[248px] overflow-y-auto rounded-[12px] border border-line">
+              {contributions.length ? (
+                contributions.map((item, index) => (
+                  <div
+                    key={item.id}
+                    className={`bg-[#171717] px-3 py-2 ${index === contributions.length - 1 ? "" : "border-b border-line"}`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <Typography.Text strong className="!text-[13px] !font-semibold">
+                        {formatCurrency(item.amount)}
+                      </Typography.Text>
+                      <Typography.Text className="!text-[11px] !text-muted">
+                        {formatDate(item.date)}
+                      </Typography.Text>
+                    </div>
+                    <Typography.Text className="mt-0.5 block !text-[12px] !text-muted">
+                      {item.note || "Setoran tabungan"}
+                    </Typography.Text>
+                  </div>
+                ))
+              ) : (
+                <Alert type="info" showIcon title="Belum ada setoran pada target ini." />
+              )}
+            </div>
+          </div>
+        </Space>
+      ) : null}
+    </Modal>
+  );
+}
+
+function getSavingStatusLabel(status) {
+  switch (status) {
+    case "completed":
+      return "Selesai";
+    case "paused":
+      return "Dijeda";
+    default:
+      return "Aktif";
+  }
+}
+
+function getSavingStatusTagClass(status) {
+  switch (status) {
+    case "completed":
+      return "bg-income/15 text-income";
+    case "paused":
+      return "bg-warning/15 text-warning";
+    default:
+      return "bg-primary/15 text-primary";
+  }
+}
+
+function getSavingStatusTextClass(status) {
+  switch (status) {
+    case "completed":
+      return "!text-income";
+    case "paused":
+      return "!text-warning";
+    default:
+      return "!text-primary";
+  }
 }
