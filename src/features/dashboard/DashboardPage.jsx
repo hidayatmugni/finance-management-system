@@ -23,6 +23,7 @@ import { TransactionList } from "../../shared/components/TransactionList";
 import { SimpleBarList } from "../../shared/components/SimpleBarList";
 import { EmptyState } from "../../shared/components/EmptyState";
 import { formatAxisCurrency, formatCurrency } from "../../shared/utils/format";
+import { themePalette } from "../../shared/config/themePalette";
 import {
   buildCategoryBreakdown,
   buildFinanceSummary,
@@ -66,7 +67,7 @@ export function DashboardPage() {
       <div className="grid grid-cols-2 gap-3">
         <MetricCard label="Pemasukan bulan ini" value={dashboardSummary.incomeMonth} tone="income" />
         <MetricCard label="Pengeluaran bulan ini" value={dashboardSummary.expenseMonth} tone="expense" />
-        <MetricCard label="Arus kas bersih" value={dashboardSummary.netCashflow} tone="savings" />
+        <MetricCard label="Arus kas bersih" value={dashboardSummary.netCashflow} tone="margin" />
         <MetricCard label="Total tabungan" value={dashboardSummary.totalSavings} tone="savings" />
       </div>
 
@@ -76,10 +77,10 @@ export function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-4 gap-2">
-        <ShortcutCard title="Input" icon={<ArrowUpOutlined />} to="/add" />
-        <ShortcutCard title="Tabung" icon={<WalletOutlined />} to="/savings" />
-        <ShortcutCard title="Hutang" icon={<WalletOutlined />} to="/debts" />
-        <ShortcutCard title="Lapor" icon={<BarChartOutlined />} to="/reports" />
+        <ShortcutCard title="Input" icon={<ArrowUpOutlined />} to="/dashboard/add" />
+        <ShortcutCard title="Tabung" icon={<WalletOutlined />} to="/dashboard/savings" />
+        <ShortcutCard title="Hutang" icon={<WalletOutlined />} to="/dashboard/debts" />
+        <ShortcutCard title="Lapor" icon={<BarChartOutlined />} to="/dashboard/reports" />
       </div>
 
       <Card className="finance-card finance-section">
@@ -87,18 +88,18 @@ export function DashboardPage() {
         <div className="mt-4 h-64">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={monthlyTrend} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
-              <CartesianGrid vertical={false} stroke="#232325" strokeDasharray="3 3" />
+              <CartesianGrid vertical={false} stroke={themePalette.colors.lineSoft} strokeDasharray="3 3" />
               <XAxis
                 dataKey="month"
                 tickLine={false}
                 axisLine={false}
-                tick={{ fill: "#8e949e", fontSize: 11 }}
+                tick={{ fill: themePalette.colors.muted, fontSize: 11 }}
               />
               <YAxis
                 width={44}
                 tickLine={false}
                 axisLine={false}
-                tick={{ fill: "#8e949e", fontSize: 11 }}
+                tick={{ fill: themePalette.colors.muted, fontSize: 11 }}
                 tickFormatter={formatAxisCurrency}
               />
               <Tooltip formatter={(value) => formatCurrency(value)} />
@@ -106,7 +107,7 @@ export function DashboardPage() {
                 verticalAlign="top"
                 height={24}
                 formatter={(value) => (
-                  <span style={{ color: "#cfd6de", fontSize: 11, fontWeight: 600 }}>
+                  <span style={{ color: themePalette.colors.inkMuted, fontSize: 11, fontWeight: 600 }}>
                     {value === "income" ? "Pemasukan" : "Pengeluaran"}
                   </span>
                 )}
@@ -114,18 +115,18 @@ export function DashboardPage() {
               <Line
                 type="monotone"
                 dataKey="income"
-                stroke="#19c06c"
+                stroke={themePalette.colors.success}
                 strokeWidth={2.5}
-                dot={{ r: 2.5, strokeWidth: 0, fill: "#19c06c" }}
+                dot={{ r: 2.5, strokeWidth: 0, fill: themePalette.colors.success }}
                 activeDot={{ r: 4 }}
                 name="income"
               />
               <Line
                 type="monotone"
                 dataKey="expense"
-                stroke="#f04452"
+                stroke={themePalette.colors.expense}
                 strokeWidth={2.5}
-                dot={{ r: 2.5, strokeWidth: 0, fill: "#f04452" }}
+                dot={{ r: 2.5, strokeWidth: 0, fill: themePalette.colors.expense }}
                 activeDot={{ r: 4 }}
                 name="expense"
               />
@@ -169,9 +170,9 @@ export function DashboardPage() {
 function ShortcutCard({ title, icon, to }) {
   return (
     <Link to={to} className="block !no-underline">
-      <Card className="finance-card finance-soft-card !h-full !border-[#2a2a2c] !text-center" styles={{ body: { padding: 12 } }}>
-        <div className="flex min-h-[78px] flex-col items-center justify-center text-center">
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#163326] text-base font-extrabold text-[#19c06c]">
+      <Card className="finance-card finance-soft-card !h-full !border-line !text-center" styles={{ body: { padding: 12 } }}>
+        <div className="flex min-h-[65px] flex-col items-center justify-center text-center">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-base font-extrabold text-primary">
             {icon}
           </span>
           <Typography.Text className="mt-2 !text-[11px] !font-semibold !text-ink">{title}</Typography.Text>

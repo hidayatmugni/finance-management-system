@@ -1,13 +1,15 @@
 import { Card, Space, Statistic, Typography } from "antd";
 import { formatCurrency } from "../utils/format";
+import { themePalette } from "../config/themePalette";
 
 export function MetricCard({ label, value, tone = "default", helper }) {
   const toneColorMap = {
-    default: "#f1f5f9",
-    income: "#19c06c",
-    expense: "#f04452",
-    savings: "#2f8fff",
-    warning: "#f5b546"
+    default: themePalette.colors.ink,
+    income: themePalette.colors.success,
+    expense: themePalette.colors.expense,
+    savings: themePalette.colors.savings,
+    margin: themePalette.colors.margin,
+    warning: themePalette.colors.warning
   };
 
   return (

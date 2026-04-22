@@ -23,7 +23,7 @@ export function AppErrorPage() {
           <Typography.Paragraph className="!m-0 !text-sm !leading-6 !text-muted">
             {message}
           </Typography.Paragraph>
-          <Link to="/">
+          <Link to="/dashboard">
             <Button type="primary" size="large">
               Kembali ke beranda
             </Button>

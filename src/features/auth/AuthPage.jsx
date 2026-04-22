@@ -42,7 +42,7 @@ export function AuthPage() {
         password: values.password
       });
 
-      navigate("/", { replace: true });
+      navigate("/dashboard", { replace: true });
     } catch (error) {
       setSubmitAlert({
         type: "error",

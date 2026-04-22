@@ -25,13 +25,14 @@ import {
 } from "../../shared/firebase/firestoreHousehold.js";
 import { createTransaction } from "../../shared/firebase/firestoreTransactions";
 import { globalFamilyId } from "../../shared/firebase/config.js";
+import { themePalette } from "../../shared/config/themePalette";
 
 const navIconMap = {
-  "/": <HomeOutlined />,
-  "/add": <PlusCircleOutlined />,
-  "/transactions": <ProfileOutlined />,
-  "/debts": <WalletOutlined />,
-  "/reports": <BarChartOutlined />
+  "/dashboard": <HomeOutlined />,
+  "/dashboard/add": <PlusCircleOutlined />,
+  "/dashboard/transactions": <ProfileOutlined />,
+  "/dashboard/debts": <WalletOutlined />,
+  "/dashboard/reports": <BarChartOutlined />
 };
 
 export function AppShell() {
@@ -120,16 +121,13 @@ export function AppShell() {
 
   return (
     <Layout className="app-phone-shell bg-transparent pb-10">
-      <Layout.Header className="sticky top-0 z-20 !h-auto !px-3 !pb-3 !pt-3 finance-glass">
+      <Layout.Header className="sticky top-0 z-20 !h-auto !px-3 !pb-3 !pt-3 ">
         <Card variant="borderless" className="finance-card !mb-0">
           <div className="flex items-start justify-between gap-3">
             <Space orientation="vertical" size={2}>
-              <Typography.Text className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted">
-                Trading Finance
-              </Typography.Text>
-              <Typography.Title level={3} className="!m-0 !text-[1rem] !font-bold">
+              <Typography.Text className="text-[1rem] font-medium uppercase tracking-[0.12em] text-muted">
                 My Finance
-              </Typography.Title>
+              </Typography.Text>
               <Typography.Text className="!text-[12px] !font-medium !text-ink">
                 {profile?.fullName || user?.displayName || user?.email || "Sudah masuk"}
               </Typography.Text>
@@ -139,8 +137,8 @@ export function AppShell() {
             </Space>
 
             <Space orientation="vertical" size={6} className="min-w-[94px]">
-              <Badge count={pendingSyncCount} color="#16b364" overflowCount={99}>
-                <Card size="small" className="finance-soft-card !rounded-[10px]" styles={{ body: { padding: 10 } }}>
+              <Badge count={pendingSyncCount} color={themePalette.colors.primary} overflowCount={99}>
+                <Card size="small" className="finance-soft-card !rounded-[10px]" styles={{ body: { padding: 6 } }}>
                   <Space size={5}>
                     <CloudSyncOutlined className="text-[13px] text-primary" />
                     <Typography.Text className="!text-[11px] !font-medium">Sinkron</Typography.Text>
@@ -164,11 +162,11 @@ export function AppShell() {
           <ul className="grid grid-cols-5 gap-1.5">
             {bottomNavItems.map((item) => (
               <li key={item.to}>
-                <NavLink to={item.to} className="block !no-underline">
+                <NavLink to={item.to} end={item.to === "/dashboard"} className="block !no-underline">
                   {({ isActive }) => (
                     <div
                       className={`flex min-h-[50px] flex-col items-center justify-center rounded-[10px] border px-1.5 py-1.5 text-center transition ${
-                        isActive ? "border-[#148a54] bg-[#163326] text-[#19c06c]" : "border-line bg-[#18181a] text-muted"
+                        isActive ? "border-primary/40 bg-primary/10 text-primary" : "border-line bg-panel text-muted"
                       }`}
                     >
                       <span className="text-[15px]">{navIconMap[item.to] || <HomeOutlined />}</span>

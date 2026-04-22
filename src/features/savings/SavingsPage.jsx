@@ -12,6 +12,7 @@ import {
 import { useAuth } from "../auth/AuthProvider";
 import { useFinanceStore } from "../../shared/state/useFinanceStore";
 import { createTransaction } from "../../shared/firebase/firestoreTransactions";
+import { themePalette } from "../../shared/config/themePalette";
 
 export function SavingsPage() {
   const family = useFinanceStore((state) => state.family);
@@ -329,7 +330,7 @@ function SavingDetailModal({ goal, contributions, onClose }) {
       title={null}
       centered
       width={420}
-      styles={{ content: { background: "#171717", padding: 16 }, body: { padding: 0 } }}
+      styles={{ content: { background: themePalette.colors.panel, padding: 16 }, body: { padding: 0 } }}
     >
       {goal ? (
         <Space orientation="vertical" size={12} className="w-full">
@@ -353,7 +354,11 @@ function SavingDetailModal({ goal, contributions, onClose }) {
                 Terkumpul {formatCurrency(goal.currentAmount || 0)} dari {formatCurrency(goal.targetAmount || 0)}
               </Typography.Text>
             </div>
-            <Progress percent={Math.round(progress)} strokeColor="#148a54" railColor="#242426" />
+            <Progress
+              percent={Math.round(progress)}
+              strokeColor={themePalette.colors.primaryStrong}
+              railColor={themePalette.colors.progressRail}
+            />
           </div>
 
           <div>
@@ -365,7 +370,7 @@ function SavingDetailModal({ goal, contributions, onClose }) {
                 contributions.map((item, index) => (
                   <div
                     key={item.id}
-                    className={`bg-[#171717] px-3 py-2 ${index === contributions.length - 1 ? "" : "border-b border-line"}`}
+                    className={`bg-panel px-3 py-2 ${index === contributions.length - 1 ? "" : "border-b border-line"}`}
                   >
                     <div className="flex items-center justify-between gap-3">
                       <Typography.Text strong className="!text-[13px] !font-semibold">
