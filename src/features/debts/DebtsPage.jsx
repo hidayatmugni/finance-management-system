@@ -12,6 +12,7 @@ import {
 import { useAuth } from "../auth/AuthProvider";
 import { useFinanceStore } from "../../shared/state/useFinanceStore";
 import { createTransaction } from "../../shared/firebase/firestoreTransactions";
+import { themePalette } from "../../shared/config/themePalette";
 
 export function DebtsPage() {
   const family = useFinanceStore((state) => state.family);
@@ -223,8 +224,8 @@ export function DebtsPage() {
             buttonStyle="solid"
             className="finance-type-toggle"
             options={[
-              { value: "debt", label: "Hutang ke orang" },
-              { value: "receivable", label: "Piutang ke orang" }
+              { value: "debt", label: "Hutang" },
+              { value: "receivable", label: "Piutang" }
             ]}
           />
           <Input
@@ -438,7 +439,7 @@ function FinanceDetailModal({ record, payments, onClose }) {
       title={null}
       centered
       width={420}
-      styles={{ content: { background: "#171717", padding: 16 }, body: { padding: 0 } }}
+      styles={{ content: { background: themePalette.colors.panel, padding: 16 }, body: { padding: 0 } }}
     >
       {record ? (
         <Space orientation="vertical" size={12} className="w-full">
@@ -469,7 +470,11 @@ function FinanceDetailModal({ record, payments, onClose }) {
                 Terbayar {formatCurrency(record.totalPaid || 0)} dari {formatCurrency(record.amountInitial || 0)}
               </Typography.Text>
             </div>
-            <Progress percent={Math.round(paidPercent)} strokeColor="#148a54" railColor="#242426" />
+            <Progress
+              percent={Math.round(paidPercent)}
+              strokeColor={themePalette.colors.primaryStrong}
+              railColor={themePalette.colors.progressRail}
+            />
           </div>
 
           <div>
@@ -481,7 +486,7 @@ function FinanceDetailModal({ record, payments, onClose }) {
                 payments.map((payment, index) => (
                   <div
                     key={payment.id}
-                    className={`bg-[#171717] px-3 py-2 ${index === payments.length - 1 ? "" : "border-b border-line"}`}
+                    className={`bg-panel px-3 py-2 ${index === payments.length - 1 ? "" : "border-b border-line"}`}
                   >
                     <div className="flex items-center justify-between gap-3">
                       <Typography.Text strong className="!text-[13px] !font-semibold">

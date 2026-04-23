@@ -1,13 +1,14 @@
 import { Card, Progress, Space, Typography } from "antd";
 import { formatCompactCurrency } from "../utils/format";
+import { themePalette } from "../config/themePalette";
 
 export function SimpleBarList({ items, colorClass = "bg-primary" }) {
   const maxValue = Math.max(...items.map((item) => item.value || item.expense || 0), 1);
   const progressColor = colorClass.includes("expense")
-    ? "#f04452"
+    ? themePalette.colors.expense
     : colorClass.includes("income")
-      ? "#19c06c"
-      : "#16b364";
+      ? themePalette.colors.success
+      : themePalette.colors.primary;
   const valueTextClass = colorClass.includes("expense")
     ? "!text-expense"
     : colorClass.includes("income")
@@ -31,7 +32,13 @@ export function SimpleBarList({ items, colorClass = "bg-primary" }) {
                 {formatCompactCurrency(value)}
               </Typography.Text>
             </div>
-            <Progress percent={percent} showInfo={false} strokeColor={progressColor} railColor="#242426" size={[0, 8]} />
+            <Progress
+              percent={percent}
+              showInfo={false}
+              strokeColor={progressColor}
+              railColor={themePalette.colors.progressRail}
+              size={[0, 8]}
+            />
           </div>
         );
       })}

@@ -4,22 +4,14 @@ export default {
   theme: {
     extend: {
       colors: {
-        canvas: "#0f0f10",
-        ink: "#f1f5f9",
-        muted: "#8e949e",
-        line: "#2a2a2c",
-        panel: "#171717",
-        primary: "#16b364",
-        income: "#19c06c",
-        expense: "#f04452",
-        savings: "#1f8a56",
-        warning: "#f5b546"
-      },
-      boxShadow: {
-        card: "0 8px 20px rgba(0, 0, 0, 0.22)"
-      },
-      borderRadius: {
-        xl2: "1rem"
+        ink: "rgb(var(--color-ink-rgb) / <alpha-value>)",
+        muted: "rgb(var(--color-muted-rgb) / <alpha-value>)",
+        line: "rgb(var(--color-line-rgb) / <alpha-value>)",
+        panel: "rgb(var(--color-panel-rgb) / <alpha-value>)",
+        primary: "rgb(var(--color-primary-rgb) / <alpha-value>)",
+        income: "rgb(var(--color-income-rgb) / <alpha-value>)",
+        expense: "rgb(var(--color-expense-rgb) / <alpha-value>)",
+        warning: "rgb(var(--color-warning-rgb) / <alpha-value>)"
       }
     }
   },

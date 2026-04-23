@@ -167,7 +167,7 @@ function MetricRow({ label, value, percent, barClass, valueClass }) {
           {value}
         </Typography.Text>
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-[#242426]">
+      <div className="h-2 overflow-hidden rounded-full bg-panel">
         <div className={`h-full rounded-full ${barClass}`} style={{ width: `${percent}%` }} />
       </div>
     </div>

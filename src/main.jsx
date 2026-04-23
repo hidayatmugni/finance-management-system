@@ -6,7 +6,9 @@ import { router } from "./app/router";
 import { AppProviders } from "./app/AppProviders";
 import "./index.css";
 import { registerServiceWorker } from "./shared/lib/pwa";
+import { applyThemeCssVariables } from "./shared/config/themePalette";
 
+applyThemeCssVariables();
 registerServiceWorker();
 
 ReactDOM.createRoot(document.getElementById("root")).render(

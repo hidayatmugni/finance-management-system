@@ -19,7 +19,7 @@ export function TransactionList({ items }) {
               <Typography.Text className="mt-1 block !text-[11px] !text-muted">
                 {item.memberName} | {item.categoryName} | {formatDate(item.date)}
               </Typography.Text>
-              <Tag className="mt-2 rounded-full border-0 bg-[#202022] px-2 py-[2px] text-[10px] font-medium text-muted">
+              <Tag className="mt-2 rounded-full border border-line bg-panel px-2 py-[2px] text-[10px] font-medium text-muted">
                 {translateSyncStatus(item.syncStatus)}
               </Tag>
             </div>

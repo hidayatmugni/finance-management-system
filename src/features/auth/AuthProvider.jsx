@@ -89,24 +89,6 @@ export function AuthProvider({ children }) {
           throw new Error(translateAuthError(error));
         }
       },
-      async register({ fullName, email, password }) {
-        if (!auth) throw new Error("Firebase belum siap.");
-        try {
-          const credential = await createUserWithEmailAndPassword(auth, email, password);
-
-          if (fullName) {
-            await updateProfile(credential.user, { displayName: fullName });
-          }
-
-          await ensureUserProvisioned({
-            ...credential.user,
-            displayName: fullName || credential.user.displayName
-          });
-          return credential;
-        } catch (error) {
-          throw new Error(translateAuthError(error));
-        }
-      },
       async logout() {
         if (!auth) return;
         return signOut(auth);

@@ -1,4 +1,4 @@
-import { createBrowserRouter } from "react-router-dom";
+import { Navigate, createBrowserRouter } from "react-router-dom";
 import { AppShell } from "./layouts/AppShell";
 import { AppErrorPage } from "./AppErrorPage";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
@@ -16,6 +16,10 @@ export const router = createBrowserRouter([
     errorElement: <AppErrorPage />,
     children: [
       {
+        path: "/",
+        element: <Navigate to="/dashboard" replace />
+      },
+      {
         element: <PublicRoute />,
         children: [{ path: "/auth", element: <AuthPage /> }]
       },
@@ -23,7 +27,7 @@ export const router = createBrowserRouter([
         element: <ProtectedRoute />,
         children: [
           {
-            path: "/",
+            path: "/dashboard",
             element: <AppShell />,
             children: [
               { index: true, element: <DashboardPage /> },

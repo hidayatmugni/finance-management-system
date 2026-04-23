@@ -7,6 +7,7 @@ import { SectionHeading } from "../../shared/components/SectionHeading";
 import { formatCurrency, formatDate } from "../../shared/utils/format";
 import { inDateRange } from "../../shared/utils/dateFilters";
 import { getKategoriByJenis, JENIS_ARUS_KAS, PILIHAN_JENIS_ARUS_KAS } from "../../shared/config/cashflow";
+import { themePalette } from "../../shared/config/themePalette";
 
 export function TransactionsPage() {
   const transactions = useFinanceStore((state) => state.transactions);
@@ -142,8 +143,8 @@ export function TransactionsPage() {
       </Card>
 
       <div className="grid grid-cols-2 gap-2">
-        <SummaryCard label="Total pemasukan" value={formatCurrency(totalPemasukan)} />
-        <SummaryCard label="Total pengeluaran" value={formatCurrency(totalPengeluaran)} />
+        <SummaryCard label="Total pemasukan" value={formatCurrency(totalPemasukan)} tone="income" />
+        <SummaryCard label="Total pengeluaran" value={formatCurrency(totalPengeluaran)} tone="expense" />
       </div>
 
       <Card className="finance-card" styles={{ body: { padding: 0, overflow: "hidden" } }}>
@@ -225,11 +226,17 @@ function Field({ label, children }) {
   );
 }
 
-function SummaryCard({ label, value }) {
+function SummaryCard({ label, value, tone }) {
+  const toneColor = tone === "income" ? themePalette.colors.success : themePalette.colors.expense;
+
   return (
     <Card className="finance-card finance-soft-card">
       <Typography.Text className="metric-label text-[10px]">{label}</Typography.Text>
-      <Typography.Title level={4} className="!mb-0 !mt-2 !text-lg !font-extrabold">
+      <Typography.Title
+        level={4}
+        className="!mb-0 !mt-2 !text-lg !font-extrabold"
+        style={{ color: toneColor }}
+      >
         {value}
       </Typography.Title>
     </Card>

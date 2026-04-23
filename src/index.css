@@ -5,16 +5,57 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --color-canvas: #0f0f10;
+    --color-canvas-soft: #101011;
+    --color-canvas-strong: #131314;
+    --color-ink: #f1f5f9;
+    --color-ink-soft: #edf2f7;
+    --color-ink-muted: #cfd6de;
+    --color-muted: #8e949e;
+    --color-muted-soft: #72767d;
+    --color-line: #2a2a2c;
+    --color-line-soft: #232325;
+    --color-line-hover: #3a3a3d;
+    --color-panel: #171717;
+    --color-panel-soft: #1a1a1b;
+    --color-panel-strong: #151516;
+    --color-panel-alt: #18181a;
+    --color-panel-header: #1b1b1d;
+    --color-panel-hover: #1a1a1c;
+    --color-progress-rail: #242426;
+    --color-primary: #16b364;
+    --color-primary-strong: #148a54;
+    --color-primary-border: #128652;
+    --color-primary-soft: #163326;
+    --color-success: #19c06c;
+    --color-expense: #f04452;
+    --color-warning: #f5b546;
+    --color-info: #1f8a56;
+    --color-white: #ffffff;
+    --color-canvas-rgb: 15 15 16;
+    --color-ink-rgb: 241 245 249;
+    --color-muted-rgb: 142 148 158;
+    --color-line-rgb: 42 42 44;
+    --color-panel-rgb: 23 23 23;
+    --color-primary-rgb: 22 179 100;
+    --color-income-rgb: 25 192 108;
+    --color-expense-rgb: 240 68 82;
+    --color-warning-rgb: 245 181 70;
+    --shadow-card: 0 8px 20px rgba(0, 0, 0, 0.22);
+    --font-app: "IBM Plex Sans", "Segoe UI", sans-serif;
+  }
+
   html {
-    font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
-    color: #f1f5f9;
-    background-color: #0f0f10;
+    font-family: var(--font-app);
+    color: var(--color-ink);
+    background-color: var(--color-canvas);
   }
 
   body {
     background:
-      radial-gradient(circle at top left, rgba(22, 179, 100, 0.08), transparent 22%),
-      linear-gradient(180deg, #101011 0%, #131314 100%);
+      radial-gradient(circle at top left, rgb(var(--color-primary-rgb) / 0.08), transparent 22%),
+      linear-gradient(180deg, var(--color-canvas-soft) 0%, var(--color-canvas-strong) 100%);
     @apply m-0 min-h-screen text-ink antialiased;
   }
 
@@ -28,32 +69,8 @@
 }
 
 @layer components {
-  .panel-card {
-    @apply rounded-xl2 border border-line bg-panel shadow-card;
-  }
-
-  .section-shell {
-    @apply panel-card p-4;
-  }
-
-  .metric-value {
-    @apply text-[1rem] font-bold tracking-tight leading-5;
-  }
-
   .metric-label {
     @apply text-[11px] font-medium uppercase tracking-[0.14em] text-muted;
-  }
-
-  .input {
-    @apply h-12 w-full rounded-2xl border border-line bg-white px-4 text-sm text-ink outline-none transition focus:border-primary;
-  }
-
-  .section-shell-compact {
-    @apply panel-card p-3;
-  }
-
-  .input-compact {
-    @apply h-10 w-full rounded-xl2 border border-line bg-white px-3 text-[13px] text-ink outline-none transition focus:border-primary;
   }
 
   .app-phone-shell {
@@ -61,20 +78,20 @@
   }
 
   .ant-card.finance-card {
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
-    border-color: #2a2a2c;
-    background: #171717;
+    box-shadow: var(--shadow-card);
+    border-color: var(--color-line);
+    background: var(--color-panel);
   }
 
   .ant-card.finance-soft-card {
-    background: linear-gradient(180deg, #1a1a1b 0%, #151516 100%);
+    background: linear-gradient(180deg, var(--color-panel-soft) 0%, var(--color-panel-strong) 100%);
   }
 
-  .finance-glass {
+  /* .finance-glass {
     background: rgba(13, 13, 14, 0.92);
     backdrop-filter: blur(10px);
     border-bottom: 1px solid #232325;
-  }
+  } */
 
   .finance-section {
     margin-bottom: 16px;
@@ -90,13 +107,13 @@
   }
 
   .finance-chip-income {
-    background: rgba(22, 179, 100, 0.14);
-    color: #19c06c;
+    background: rgb(var(--color-primary-rgb) / 0.14);
+    color: var(--color-success);
   }
 
   .finance-chip-expense {
-    background: rgba(240, 68, 82, 0.14);
-    color: #f04452;
+    background: rgb(var(--color-expense-rgb) / 0.14);
+    color: var(--color-expense);
   }
 
   .ant-input,
@@ -108,9 +125,9 @@
   .ant-picker,
   .ant-radio-button-wrapper,
   .ant-btn-default {
-    background: #18181a !important;
-    color: #f1f5f9 !important;
-    border-color: #2a2a2c !important;
+    background: var(--color-panel-alt) !important;
+    color: var(--color-ink) !important;
+    border-color: var(--color-line) !important;
   }
 
   .ant-radio-group.finance-type-toggle {
@@ -125,9 +142,9 @@
     justify-content: center;
     min-height: 48px;
     border-radius: 14px !important;
-    border: 1px solid #233041 !important;
-    background: #101823 !important;
-    color: #cfd6de !important;
+    border: 1px solid var(--color-line) !important;
+    background: transparent !important;
+    color: var(--color-ink-muted) !important;
     font-weight: 700;
     text-align: center;
     padding-inline: 10px !important;
@@ -140,15 +157,15 @@
   }
 
   .ant-radio-group.finance-type-toggle .ant-radio-button-wrapper-checked {
-    border-color: #128652 !important;
-    background: #148a54 !important;
-    color: #ffffff !important;
+    border-color: var(--color-primary-border) !important;
+    background: var(--color-primary-strong) !important;
+    color: var(--color-white) !important;
     box-shadow: none !important;
   }
 
   .ant-radio-group.finance-type-toggle .ant-radio-button-wrapper:not(.ant-radio-button-wrapper-checked):hover {
-    border-color: #3a3a3d !important;
-    color: #ffffff !important;
+    border-color: var(--color-line-hover) !important;
+    color: var(--color-white) !important;
   }
 
   .ant-input::placeholder,
@@ -156,7 +173,7 @@
   .ant-select-selection-placeholder,
   .ant-input-password input::placeholder,
   .ant-input-affix-wrapper input::placeholder {
-    color: #72767d !important;
+    color: var(--color-muted-soft) !important;
   }
 
   .ant-card .ant-card-body,
@@ -165,18 +182,18 @@
   .ant-table-tbody > tr > td,
   .ant-table-thead > tr > th,
   .ant-list-item {
-    color: #edf2f7;
+    color: var(--color-ink-soft);
   }
 
   .ant-table-thead > tr > th {
-    background: #1b1b1d !important;
-    border-bottom-color: #2a2a2c !important;
+    background: var(--color-panel-header) !important;
+    border-bottom-color: var(--color-line) !important;
     font-size: 12px !important;
   }
 
   .ant-table-tbody > tr > td {
-    background: #171717 !important;
-    border-bottom-color: #232325 !important;
+    background: var(--color-panel) !important;
+    border-bottom-color: var(--color-line-soft) !important;
     font-size: 12px !important;
   }
 
@@ -190,7 +207,7 @@
   }
 
   .ant-progress-inner {
-    background-color: #242426 !important;
+    background-color: var(--color-progress-rail) !important;
   }
 
   .ant-form-item {
@@ -200,7 +217,7 @@
   .ant-progress-text {
     font-size: 12px !important;
     font-weight: 600 !important;
-    color: #d8dee6 !important;
+    color: var(--color-ink-muted) !important;
   }
 
   .ant-typography,
