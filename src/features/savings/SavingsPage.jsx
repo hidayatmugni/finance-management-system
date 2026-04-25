@@ -257,9 +257,12 @@ export function SavingsPage() {
           <Table
             size="small"
             rowKey="id"
-            pagination={false}
+            pagination={{
+              pageSize: 10,
+              size: "small",
+              showSizeChanger: false
+            }}
             dataSource={savingsGoals}
-            scroll={{ x: 420, y: 430 }}
             onRow={(record) => ({
               onClick: () => setSelectedGoal(record)
             })}

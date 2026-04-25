@@ -7,6 +7,7 @@ import { AddTransactionPage } from "../features/transactions/AddTransactionPage"
 import { ReportsPage } from "../features/reports/ReportsPage";
 import { SavingsPage } from "../features/savings/SavingsPage";
 import { DebtsPage } from "../features/debts/DebtsPage";
+import { AdminPage } from "../features/admin/AdminPage";
 import { AuthPage } from "../features/auth/AuthPage";
 import { ProtectedRoute } from "../features/auth/ProtectedRoute";
 import { PublicRoute } from "../features/auth/PublicRoute";
@@ -35,7 +36,8 @@ export const router = createBrowserRouter([
               { path: "add", element: <AddTransactionPage /> },
               { path: "reports", element: <ReportsPage /> },
               { path: "savings", element: <SavingsPage /> },
-              { path: "debts", element: <DebtsPage /> }
+              { path: "debts", element: <DebtsPage /> },
+              { path: "admin", element: <AdminPage /> }
             ]
           }
         ]

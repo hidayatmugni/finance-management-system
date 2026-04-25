@@ -347,9 +347,12 @@ export function DebtsPage() {
             size="small"
             tableLayout="fixed"
             rowKey="id"
-            pagination={false}
+            pagination={{
+              pageSize: 10,
+              size: "small",
+              showSizeChanger: false
+            }}
             dataSource={financeRecords}
-            scroll={{ x: 520, y: 430 }}
             onRow={(record) => ({
               onClick: () => setSelectedRecord(record)
             })}

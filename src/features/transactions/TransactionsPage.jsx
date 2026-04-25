@@ -157,7 +157,6 @@ export function TransactionsPage() {
             size: "small",
             showSizeChanger: false
           }}
-          scroll={{ y: 560 }}
           dataSource={displayTransactions}
           locale={{ emptyText: "Tidak ada data pada filter yang dipilih." }}
           columns={[
