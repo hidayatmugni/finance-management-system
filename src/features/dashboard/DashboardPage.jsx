@@ -72,11 +72,11 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-4">
-      <SectionHeading eyebrow="Beranda" title={`Ringkasan ${family?.name || "keuangan keluarga"}`} />
+      <SectionHeading title="Ringkasan Bulan Ini" />
 
       <div className="grid grid-cols-2 gap-3">
-        <MetricCard label="Pemasukan bulan ini" value={dashboardSummary.incomeMonth} tone="income" />
-        <MetricCard label="Pengeluaran bulan ini" value={dashboardSummary.expenseMonth} tone="expense" />
+        <MetricCard label="Pemasukan" value={dashboardSummary.incomeMonth} tone="income" />
+        <MetricCard label="Pengeluaran" value={dashboardSummary.expenseMonth} tone="expense" />
         <MetricCard label="Arus kas bersih" value={dashboardSummary.netCashflow} tone="margin" />
         <MetricCard label="Total tabungan" value={dashboardSummary.totalSavings} tone="savings" />
       </div>
@@ -230,9 +230,9 @@ export function DashboardPage() {
 function ShortcutCard({ title, icon, to }) {
   return (
     <Link to={to} className="block !no-underline">
-      <Card className="finance-card finance-soft-card !h-full !border-line !text-center" styles={{ body: { padding: 12 } }}>
-        <div className="flex min-h-[65px] flex-col items-center justify-center text-center">
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-base font-extrabold text-primary">
+      <Card className="!h-full !border-line !text-center" styles={{ body: { padding: 6 } }}>
+        <div className="flex min-h-[60px] flex-col items-center justify-center text-center">
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-base font-extrabold ">
             {icon}
           </span>
           <Typography.Text className="mt-2 !text-[11px] !font-semibold !text-ink">{title}</Typography.Text>

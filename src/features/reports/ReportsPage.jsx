@@ -176,7 +176,7 @@ export function ReportsPage() {
         </div>
 
         <Typography.Paragraph className="!mb-0 !mt-3 !text-[12px] !leading-5 !text-muted">
-          Default laporan tampil global. Anda bisa filter per user untuk melihat tren pemasukan, pengeluaran, tabungan, dan pembayaran hutang dengan lebih fokus.
+           Anda bisa filter per user untuk melihat tren pemasukan, pengeluaran, tabungan, dan pembayaran hutang dengan lebih fokus.
         </Typography.Paragraph>
 
         <Link to="/dashboard/admin" className="mt-3 inline-block !no-underline">
