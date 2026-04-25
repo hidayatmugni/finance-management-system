@@ -1,6 +1,7 @@
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   onSnapshot,
@@ -201,4 +202,20 @@ export async function updateFinanceRecord(familyId, recordId, payload) {
     ...payload,
     updatedAt: serverTimestamp()
   });
+}
+
+export async function deleteSavingGoal(familyId, goalId) {
+  return deleteDoc(doc(db, "families", familyId, "savingGoals", goalId));
+}
+
+export async function deleteSavingContribution(familyId, contributionId) {
+  return deleteDoc(doc(db, "families", familyId, "savingContributions", contributionId));
+}
+
+export async function deleteFinanceRecord(familyId, recordId) {
+  return deleteDoc(doc(db, "families", familyId, "financeRecords", recordId));
+}
+
+export async function deleteFinancePayment(familyId, paymentId) {
+  return deleteDoc(doc(db, "families", familyId, "financePayments", paymentId));
 }

@@ -1,6 +1,8 @@
 import {
   addDoc,
   collection,
+  deleteDoc,
+  doc,
   onSnapshot,
   orderBy,
   query,
@@ -33,4 +35,8 @@ export async function createTransaction({ familyId, payload }) {
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   });
+}
+
+export async function deleteTransaction({ familyId, transactionId }) {
+  return deleteDoc(doc(db, "families", familyId, "transactions", transactionId));
 }

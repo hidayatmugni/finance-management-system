@@ -157,27 +157,46 @@ export function AppShell() {
         <Outlet />
       </Layout.Content>
 
-      <Layout.Footer className="fixed bottom-0 left-0 right-0 z-30 mx-auto w-full max-w-md !px-3 !pb-3 !pt-2 finance-glass">
-        <Card variant="borderless" className="finance-card !mb-0">
-          <ul className="grid grid-cols-5 gap-1.5">
+      <Layout.Footer className="fixed bottom-0 left-0 right-0 z-30 mx-auto w-full max-w-md !px-4 !pb-4 !pt-2 finance-glass">
+        <div className="relative">
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[78px] rounded-t-[26px] bg-panel" />
+          <div className="pointer-events-none absolute left-1/2 top-[-18px] h-[54px] w-[116px] -translate-x-1/2 rounded-t-[999px] bg-panel" />
+          <ul className="relative grid grid-cols-5 items-end gap-1.5 rounded-t-[26px] bg-panel px-2 pb-2 pt-2 shadow-[0_-10px_24px_rgba(0,0,0,0.24)]">
             {bottomNavItems.map((item) => (
               <li key={item.to}>
                 <NavLink to={item.to} end={item.to === "/dashboard"} className="block !no-underline">
                   {({ isActive }) => (
-                    <div
-                      className={`flex min-h-[50px] flex-col items-center justify-center rounded-[10px] border px-1.5 py-1.5 text-center transition ${
-                        isActive ? "border-primary/40 bg-primary/10 text-primary" : "border-line bg-panel text-muted"
-                      }`}
-                    >
-                      <span className="text-[15px]">{navIconMap[item.to] || <HomeOutlined />}</span>
-                      <span className="mt-1 text-[10px] font-medium leading-none">{item.label}</span>
-                    </div>
+                    item.to === "/dashboard/add" ? (
+                      <div className="relative -mt-8 flex justify-center">
+                        <div
+                          className={`flex h-[72px] w-[72px] flex-col items-center justify-center rounded-full border border-line bg-panel text-center shadow-[0_12px_28px_rgba(0,0,0,0.22)] transition ${
+                            isActive
+                              ? "text-primary"
+                              : "text-primary"
+                          }`}
+                        >
+                          <span className="text-[24px] leading-none">{navIconMap[item.to] || <HomeOutlined />}</span>
+                          <span className="mt-1 text-[11px] font-semibold leading-none">{item.label}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        className={`flex min-h-[54px] flex-col items-center justify-center rounded-[18px] border border-transparent px-1 py-1.5 text-center transition ${
+                          isActive
+                            ? "bg-primary/10 text-primary"
+                            : "bg-transparent text-muted"
+                        }`}
+                      >
+                        <span className="text-[16px] leading-none">{navIconMap[item.to] || <HomeOutlined />}</span>
+                        <span className="mt-1.5 text-[10px] font-medium leading-none">{item.label}</span>
+                      </div>
+                    )
                   )}
                 </NavLink>
               </li>
             ))}
           </ul>
-        </Card>
+        </div>
       </Layout.Footer>
     </Layout>
   );

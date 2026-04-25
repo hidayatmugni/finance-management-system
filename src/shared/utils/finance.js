@@ -52,6 +52,28 @@ export function buildMonthlyTrend(transactions, options = {}) {
   });
 }
 
+export function buildCurrentMonthDailyTrend(transactions, options = {}) {
+  const now = dayjs();
+  const year = options.year ?? now.year();
+  const month = options.month ?? now.month();
+  const totalDays = dayjs(`${year}-${String(month + 1).padStart(2, "0")}-01`).daysInMonth();
+
+  return Array.from({ length: totalDays }, (_, index) => {
+    const dayNumber = index + 1;
+    const dayTransactions = transactions.filter((item) => {
+      if (!item.date) return false;
+      const date = dayjs(item.date);
+      return date.year() === year && date.month() === month && date.date() === dayNumber;
+    });
+
+    return {
+      day: String(dayNumber).padStart(2, "0"),
+      income: sumAmount(dayTransactions.filter((item) => item.type === "income")),
+      expense: sumAmount(dayTransactions.filter((item) => item.type === "expense"))
+    };
+  });
+}
+
 export function buildCategoryBreakdown(transactions) {
   const expenseItems = transactions.filter((item) => item.type === "expense");
   const grouped = new Map();
