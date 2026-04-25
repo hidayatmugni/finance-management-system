@@ -9,11 +9,6 @@ export function SimpleBarList({ items, colorClass = "bg-primary" }) {
     : colorClass.includes("income")
       ? themePalette.colors.success
       : themePalette.colors.primary;
-  const valueTextClass = colorClass.includes("expense")
-    ? "!text-expense"
-    : colorClass.includes("income")
-      ? "!text-income"
-      : "!text-primary";
 
   return (
     <Card className="finance-card">
@@ -28,7 +23,7 @@ export function SimpleBarList({ items, colorClass = "bg-primary" }) {
               <Typography.Text strong className="!text-[13px] !font-semibold !text-ink">
                 {item.name}
               </Typography.Text>
-              <Typography.Text className={`!text-[11px] !font-semibold ${valueTextClass}`}>
+              <Typography.Text className="!text-[11px] !font-semibold !text-ink">
                 {formatCompactCurrency(value)}
               </Typography.Text>
             </div>

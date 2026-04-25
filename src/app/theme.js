@@ -5,7 +5,7 @@ export const appTheme = {
   algorithm: antdTheme.darkAlgorithm,
   token: {
     colorPrimary: themePalette.colors.primary,
-    colorSuccess: themePalette.colors.primary,
+    colorSuccess: themePalette.colors.success,
     colorWarning: themePalette.colors.warning,
     colorError: themePalette.colors.expense,
     colorInfo: themePalette.colors.info,
@@ -24,9 +24,9 @@ export const appTheme = {
   },
   components: {
     Layout: {
-      headerBg: "rgba(16, 16, 17, 0.92)",
+      headerBg: "rgba(22, 19, 33, 0.94)",
       bodyBg: themePalette.colors.canvas,
-      footerBg: "rgba(16, 16, 17, 0.96)"
+      footerBg: "rgba(22, 19, 33, 0.96)"
     },
     Card: {
       bodyPadding: 12,
@@ -66,10 +66,10 @@ export const appTheme = {
       hoverBorderColor: themePalette.colors.primary
     },
     Radio: {
-      buttonSolidCheckedBg: themePalette.colors.primary,
-      buttonSolidCheckedHoverBg: themePalette.colors.success,
-      buttonCheckedBg: themePalette.colors.primary,
-      buttonCheckedHoverBg: themePalette.colors.success,
+      buttonSolidCheckedBg: themePalette.colors.primaryStrong,
+      buttonSolidCheckedHoverBg: themePalette.colors.primaryStrong,
+      buttonCheckedBg: themePalette.colors.primarySoft,
+      buttonCheckedHoverBg: themePalette.colors.primarySoft,
       buttonColor: themePalette.colors.ink
     }
   }

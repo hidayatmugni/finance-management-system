@@ -1,5 +1,6 @@
 import dayjs from "dayjs";
-import { Card, DatePicker, Form, Select, Table, Tag, Typography } from "antd";
+import { ArrowDownOutlined, ArrowUpOutlined } from "@ant-design/icons";
+import { Card, DatePicker, Form, Select, Table, Typography } from "antd";
 import { useMemo } from "react";
 import { useFinanceStore } from "../../shared/state/useFinanceStore";
 import { EmptyState } from "../../shared/components/EmptyState";
@@ -48,7 +49,7 @@ export function TransactionsPage() {
   if (!transactions.length) {
     return (
       <div className="space-y-4">
-        <SectionHeading eyebrow="Tabel Harian" title="Ringkasan transaksi yang mudah dibaca" />
+        <SectionHeading eyebrow="Tabel Harian" title="Ringkasan transaksi" />
         <EmptyState
           title="Belum ada transaksi"
           description="Setelah Anda mulai input pemasukan atau pengeluaran, tabel harian akan tampil di sini."
@@ -59,7 +60,7 @@ export function TransactionsPage() {
 
   return (
     <div className="space-y-2.5">
-      <SectionHeading eyebrow="Tabel Harian" title="Ringkasan transaksi yang mudah dibaca" />
+      <SectionHeading eyebrow="Tabel Harian" title="Ringkasan transaksi" />
 
       <Card className="finance-card finance-soft-card">
         <Form layout="vertical" component={false}>
@@ -171,17 +172,6 @@ export function TransactionsPage() {
               )
             },
             {
-              title: "Nominal",
-              dataIndex: "amount",
-              width: 98,
-              align: "right",
-              render: (value, item) => (
-                <Typography.Text className={`!text-[11px] !font-medium ${item.type === JENIS_ARUS_KAS.PEMASUKAN ? "!text-income" : "!text-expense"}`}>
-                  {formatCurrency(value)}
-                </Typography.Text>
-              )
-            },
-            {
               title: "User",
               dataIndex: "memberName",
               width: 84,
@@ -201,6 +191,34 @@ export function TransactionsPage() {
                 </Typography.Text>
               )
             },
+            {
+                title: "Nominal",
+                dataIndex: "amount",
+                width: 112,
+                align: "right",
+                render: (value, item) => (
+                  <div className="flex items-center justify-end gap-1.5">
+                    <span
+                      className="flex items-center justify-center"
+                      style={{
+                        color:
+                          item.type === JENIS_ARUS_KAS.PEMASUKAN
+                            ? themePalette.colors.success
+                            : themePalette.colors.expense
+                      }}
+                    >
+                      {item.type === JENIS_ARUS_KAS.PEMASUKAN ? (
+                        <ArrowDownOutlined className="text-[10px]" />
+                      ) : (
+                        <ArrowUpOutlined className="text-[10px]" />
+                      )}
+                    </span>
+                    <Typography.Text className="!text-[11px] !font-medium !text-ink">
+                      {formatCurrency(value)}
+                    </Typography.Text>
+                  </div>
+                )
+              },
             
           ]}
         />
@@ -226,18 +244,28 @@ function Field({ label, children }) {
 }
 
 function SummaryCard({ label, value, tone }) {
-  const toneColor = tone === "income" ? themePalette.colors.success : themePalette.colors.expense;
+  const isIncome = tone === "income";
+  const toneColor = isIncome ? themePalette.colors.success : themePalette.colors.expense;
 
   return (
     <Card className="finance-card finance-soft-card">
-      <Typography.Text className="metric-label text-[10px]">{label}</Typography.Text>
-      <Typography.Title
-        level={4}
-        className="!mb-0 !mt-2 !text-lg !font-extrabold"
-        style={{ color: toneColor }}
-      >
-        {value}
-      </Typography.Title>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <Typography.Text className="metric-label text-[10px]">{label}</Typography.Text>
+          <Typography.Title level={4} className="!mb-0 !mt-2 !text-lg !font-semibold !text-ink">
+            {value}
+          </Typography.Title>
+        </div>
+        <span
+          className="flex h-8 w-8 items-center justify-center rounded-full"
+          style={{
+            background: `${toneColor}1f`,
+            color: toneColor
+          }}
+        >
+          {isIncome ? <ArrowDownOutlined /> : <ArrowUpOutlined />}
+        </span>
+      </div>
     </Card>
   );
 }

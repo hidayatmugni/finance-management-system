@@ -1,15 +1,15 @@
 import {
   BarChartOutlined,
-  CloudSyncOutlined,
   HomeOutlined,
   LogoutOutlined,
   PlusCircleOutlined,
   ProfileOutlined,
   WalletOutlined
 } from "@ant-design/icons";
-import { Badge, Button, Card, Layout, Space, Typography } from "antd";
-import { NavLink, Outlet } from "react-router-dom";
-import { useEffect } from "react";
+import dayjs from "dayjs";
+import { Button, Card, Layout, Space, Typography } from "antd";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { useEffect, useMemo } from "react";
 import { bottomNavItems } from "../../shared/config/navigation";
 import { useFinanceStore } from "../../shared/state/useFinanceStore";
 import { useAuth } from "../../features/auth/AuthProvider";
@@ -25,7 +25,7 @@ import {
 } from "../../shared/firebase/firestoreHousehold.js";
 import { createTransaction } from "../../shared/firebase/firestoreTransactions";
 import { globalFamilyId } from "../../shared/firebase/config.js";
-import { themePalette } from "../../shared/config/themePalette";
+import { formatCurrency } from "../../shared/utils/format";
 
 const navIconMap = {
   "/dashboard": <HomeOutlined />,
@@ -37,6 +37,7 @@ const navIconMap = {
 
 export function AppShell() {
   const { logout, token, user, profile, isFirebaseReady } = useAuth();
+  const location = useLocation();
   const family = useFinanceStore((state) => state.family);
   const setFamily = useFinanceStore((state) => state.setFamily);
   const setMembers = useFinanceStore((state) => state.setMembers);
@@ -46,8 +47,26 @@ export function AppShell() {
   const setFinancePayments = useFinanceStore((state) => state.setFinancePayments);
   const setTransactions = useFinanceStore((state) => state.setTransactions);
   const resetHouseholdData = useFinanceStore((state) => state.resetHouseholdData);
-  const pendingSyncCount = useFinanceStore(
-    (state) => state.transactions.filter((item) => item.syncStatus === "pending").length,
+  const transactions = useFinanceStore((state) => state.transactions);
+  const isDashboardHome = location.pathname === "/dashboard";
+  const todayLabel = useMemo(
+    () => dayjs().locale("id").format("dddd, DD MMMM YYYY"),
+    [],
+  );
+  const greeting = useMemo(() => {
+    const hour = dayjs().hour();
+    if (hour < 11) return "Selamat pagi";
+    if (hour < 15) return "Selamat siang";
+    if (hour < 18) return "Selamat sore";
+    return "Selamat malam";
+  }, []);
+  const runningBalance = useMemo(
+    () =>
+      transactions.reduce((total, item) => {
+        const amount = Number(item.amount || 0);
+        return item.type === "income" ? total + amount : total - amount;
+      }, 0),
+    [transactions],
   );
 
   useEffect(() => {
@@ -121,43 +140,62 @@ export function AppShell() {
 
   return (
     <Layout className="app-phone-shell bg-transparent pb-10">
-      <Layout.Header className="sticky top-0 z-20 !h-auto !px-3 !pb-3 !pt-3 ">
-        <Card variant="borderless" className="finance-card !mb-0">
-          <div className="flex items-start justify-between gap-3">
-            <Space orientation="vertical" size={2}>
-              <Typography.Text className="text-[1rem] font-medium uppercase tracking-[0.12em] text-muted">
-                My Finance
-              </Typography.Text>
-              <Typography.Text className="!text-[12px] !font-medium !text-ink">
-                {profile?.fullName || user?.displayName || user?.email || "Sudah masuk"}
-              </Typography.Text>
-              <Typography.Text className="!text-[11px] !text-muted">
-                {family?.name || "Keluarga Mugni"}
-              </Typography.Text>
-            </Space>
+      {isDashboardHome ? (
+        <Layout.Header className="sticky top-0 z-20 !h-auto !px-0 !pb-0 !pt-0 bg-transparent">
+          <Card
+            variant="borderless"
+            className="!mb-0 !overflow-hidden !rounded-[30px]"
+              styles={{
+                body: {
+                  padding: 18,
+                  background: "linear-gradient(180deg, #202020 0%, #15181f 100%)",
+                boxShadow: "0 20px 42px rgba(33, 33, 34, 0.42)"
+              }
+            }}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <Space orientation="vertical" size={2} className="min-w-0">
+                <Typography.Text className="!text-[14px] !font-semibold !uppercase !tracking-[0.18em] !text-muted">
+                  {greeting}  {profile?.fullName || user?.displayName || user?.email || "Sudah masuk"}
+                </Typography.Text>
+                <Typography.Text className="!text-[12px] !text-muted">
+                  {todayLabel}
+                </Typography.Text>
+              </Space>
 
-            <Space orientation="vertical" size={6} className="min-w-[94px]">
-              <Badge count={pendingSyncCount} color={themePalette.colors.primary} overflowCount={99}>
-                <Card size="small" className="finance-soft-card !rounded-[10px]" styles={{ body: { padding: 6 } }}>
-                  <Space size={5}>
-                    <CloudSyncOutlined className="text-[13px] text-primary" />
-                    <Typography.Text className="!text-[11px] !font-medium">Sinkron</Typography.Text>
-                  </Space>
-                </Card>
-              </Badge>
-              <Button icon={<LogoutOutlined />} onClick={() => logout()} size="small" block className="!font-medium">
-                Keluar
-              </Button>
-            </Space>
-          </div>
-        </Card>
-      </Layout.Header>
+              <Button
+                icon={<LogoutOutlined />}
+                onClick={() => logout()}
+                size="small"
+                className="!flex !h-10 !w-10 !items-center !justify-center !rounded-full !border !border-line !bg-panel !p-0 !text-muted hover:!border-primary/40 hover:!text-primary"
+              />
+            </div>
+            <div className="flex items-center justify-between gap-4 rounded-[22px] mt-2 border borders-[#06392F] px-4 py-2 ">
+              <Space orientation="vertical" size={4} className="min-w-0">
+                <Typography.Text className="!text-[11px] !font-medium !tracking-[0.08em] !text-[#ddffef]">
+                  Sisa saldo
+                </Typography.Text>
+                <Typography.Text className="!block !text-[25px] !font-semibold !leading-none !text-primary">
+                  {formatCurrency(runningBalance)}
+                </Typography.Text>
+              </Space>
 
-      <Layout.Content className="px-3 pb-24 pt-3">
+                <div className="flex  shrink-0 items-center justify-center rounded-[24px] border border-white/10 bg-black/10">
+                <div className="relative h-11 w-14 rounded-[14px] border border-white/12 bg-[#0fa968]">
+                  <div className="absolute left-3 top-3 h-2 w-8 rounded-full bg-[#eafff4]" />
+                  <div className="absolute left-3 top-7 h-2 w-5 rounded-full bg-[#9cf1c5]" />
+                </div>
+              </div>
+            </div>
+          </Card>
+        </Layout.Header>
+      ) : null}
+
+      <Layout.Content className={`px-3 pb-24 ${isDashboardHome ? "pt-3" : "pt-4"}`}>
         <Outlet />
       </Layout.Content>
 
-      <Layout.Footer className="fixed bottom-0 left-0 right-0 z-30 mx-auto w-full max-w-md !px-4 !pb-4 !pt-2 finance-glass">
+      <Layout.Footer className="fixed bottom-0 left-0 right-0 z-30 mx-auto w-full max-w-md !px-0 !pb-0 !pt-2 finance-glass bg-transparent">
         <div className="relative">
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[78px] rounded-t-[26px] bg-panel" />
           <div className="pointer-events-none absolute left-1/2 top-[-18px] h-[54px] w-[116px] -translate-x-1/2 rounded-t-[999px] bg-panel" />

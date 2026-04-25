@@ -1,56 +1,106 @@
+import { ArrowDownOutlined, ArrowUpOutlined } from "@ant-design/icons";
 import { useEffect, useMemo, useState } from "react";
 import { Card, Empty, Pagination, Space, Typography } from "antd";
 import { formatCurrency, formatDate } from "../utils/format";
+import { themePalette } from "../config/themePalette";
 
 export function TransactionList({ items, pageSize = 6, minHeight = 360 }) {
   const [page, setPage] = useState(1);
+  const effectivePageSize = useMemo(() => {
+    const estimatedRowHeight = 64;
+    return Math.max(1, Math.floor(minHeight / estimatedRowHeight));
+  }, [minHeight]);
 
   useEffect(() => {
     setPage(1);
-  }, [items, pageSize]);
+  }, [items, effectivePageSize, pageSize]);
 
   const pagedItems = useMemo(() => {
-    const startIndex = (page - 1) * pageSize;
-    return items.slice(startIndex, startIndex + pageSize);
-  }, [items, page, pageSize]);
+    const currentPageSize = Math.min(pageSize, effectivePageSize);
+    const startIndex = (page - 1) * currentPageSize;
+    return items.slice(startIndex, startIndex + currentPageSize);
+  }, [effectivePageSize, items, page, pageSize]);
 
+  const finalPageSize = Math.min(pageSize, effectivePageSize);
+
+  const avatarColors = [
+    "#47d371", // kuning
+    "#e76b58", // merah soft
+    "#a7e6e2", // cyan
+    "#b4e943", // lime
+    "#7c45e2", // ungu
+    "#e4a040"  // orange
+  ];
+
+  function getAvatarColor(seed) {
+    if (!seed) return avatarColors[0];
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) {
+      hash = seed.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return avatarColors[Math.abs(hash) % avatarColors.length];
+  }
   return (
     <Card className="finance-card">
       {items.length ? (
         <>
           <div style={{ minHeight }}>
-            <Space orientation="vertical" size={8} className="w-full">
-              {pagedItems.map((item, index) => (
+            <Space orientation="vertical" size={10} className="w-full">
+              {pagedItems.map((item) => (
                 <div
                   key={item.id}
-                  className={`flex w-full items-start justify-between gap-3 pb-2 ${
-                    index === pagedItems.length - 1 ? "" : "border-b border-line"
-                  }`}
+                  className="flex w-full items-center justify-between gap-3 rounded-[16px] border border-line bg-[#252830] px-3 py-2.5"
                 >
-                  <div className="min-w-0">
-                    <Typography.Text strong className="block !text-[12px] !font-semibold">
-                      {truncateText(item.title, 34)}
-                    </Typography.Text>
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold"
+                      style={{
+                        background: getAvatarColor(item.memberName || item.title),
+                        color: "#151515"
+                      }}
+                    >
+                      {getInitials(item.memberName || item.title)}
+                    </div>
+                    <div className="min-w-0">
+                      <Typography.Text strong className="block !text-[12px] !font-semibold !text-ink">
+                        {truncateText(item.title, 28)}
+                      </Typography.Text>
+                      <Typography.Text className="mt-0.5 block !text-[10px] !text-muted">
+                        {truncateText(item.memberName || "-", 10)} | {truncateText(item.categoryName || "-", 10)} | {formatDate(item.date)}
+                      </Typography.Text>
+                    </div>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <span className="flex items-center justify-end gap-1.5">
+                      <span
+                        className="flex items-center justify-center"
+                        style={{
+                          color:
+                            item.type === "income"
+                              ? themePalette.colors.success
+                              : themePalette.colors.expense
+                        }}
+                      >
+                        {item.type === "income" ? <ArrowDownOutlined className="text-[10px]" /> : <ArrowUpOutlined className="text-[10px]" />}
+                      </span>
+                      <Typography.Text className="!text-[11px] !font-semibold !text-ink">
+                        {formatCurrency(item.amount)}
+                      </Typography.Text>
+                    </span>
                     <Typography.Text className="mt-0.5 block !text-[10px] !text-muted">
-                      {item.memberName} | {item.categoryName} | {formatDate(item.date)}
+                      {item.type === "income" ? "Pemasukan" : "Pengeluaran"}
                     </Typography.Text>
                   </div>
-                  <Typography.Text
-                    className={item.type === "income" ? "!text-[11px] !font-semibold !text-income" : "!text-[11px] !font-semibold !text-expense"}
-                  >
-                    {item.type === "income" ? "+" : "-"}
-                    {formatCurrency(item.amount)}
-                  </Typography.Text>
                 </div>
               ))}
             </Space>
           </div>
 
-          {items.length > pageSize ? (
+          {items.length > finalPageSize ? (
             <div className="mt-3 flex justify-end">
               <Pagination
                 current={page}
-                pageSize={pageSize}
+                pageSize={finalPageSize}
                 total={items.length}
                 size="small"
                 showSizeChanger={false}
@@ -72,4 +122,14 @@ export function TransactionList({ items, pageSize = 6, minHeight = 360 }) {
 function truncateText(value, maxLength) {
   if (!value) return "-";
   return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
+}
+
+function getInitials(value) {
+  if (!value) return "TR";
+  return value
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("") || "TR";
 }
