@@ -252,7 +252,7 @@ function SummaryCard({ label, value, tone }) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <Typography.Text className="metric-label text-[10px]">{label}</Typography.Text>
-          <Typography.Title level={4} className="!mb-0 !mt-2 !text-lg !font-semibold !text-ink">
+          <Typography.Title level={4} className="!mb-0 !mt-2 !text-[14px] !font-bold !text-ink">
             {value}
           </Typography.Title>
         </div>
