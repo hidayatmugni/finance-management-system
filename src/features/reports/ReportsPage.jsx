@@ -27,9 +27,12 @@ import {
 import { exportLaporanTahunanExcel } from "../../shared/utils/excelExport";
 import {
   formatCompactCurrency,
-  formatCurrency
+  formatCurrency,
+  formatDate
 } from "../../shared/utils/format";
 import { themePalette } from "../../shared/config/themePalette";
+import { useAuth } from "../auth/AuthProvider";
+// import { openDailyInvoicePrint } from "../../shared/utils/dailyInvoice";
 
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 
@@ -40,6 +43,7 @@ export function ReportsPage() {
   const savingContributions = useFinanceStore((state) => state.savingContributions);
   const financePayments = useFinanceStore((state) => state.financePayments);
   const financeRecords = useFinanceStore((state) => state.financeRecords);
+  const { user } = useAuth();
   const [selectedYear, setSelectedYear] = useState(String(dayjs().year()));
   const [activeMemberId, setActiveMemberId] = useState("all");
   const [selectedMonth, setSelectedMonth] = useState(null);
@@ -106,6 +110,35 @@ export function ReportsPage() {
     [monthlyDataset, selectedMonth],
   );
 
+  const invoiceMemberId = activeMemberId === "all" ? user?.uid || "" : activeMemberId;
+  const invoiceMember = members.find((member) => member.id === invoiceMemberId);
+  // const dailyInvoiceTransactions = useMemo(() => {
+  //   const today = dayjs().format("YYYY-MM-DD");
+
+  //   return transactions.filter((item) => {
+  //     const sameDay = item.date === today;
+  //     const sameUser = invoiceMemberId ? item.userId === invoiceMemberId : false;
+  //     return sameDay && sameUser;
+  //   });
+  // }, [invoiceMemberId, transactions]);
+
+  // const handleOpenDailyInvoice = () => {
+  //   const expenses = dailyInvoiceTransactions
+  //     .filter((item) => item.type === "expense")
+  //     .map((item) => mapTransactionToInvoiceRow(item));
+  //   const incomes = dailyInvoiceTransactions
+  //     .filter((item) => item.type === "income")
+  //     .map((item) => mapTransactionToInvoiceRow(item));
+
+  //   openDailyInvoicePrint({
+  //     familyName: family?.name || "My Finance",
+  //     memberName: invoiceMember?.fullName || invoiceMember?.name || user?.displayName || user?.email || "User",
+  //     dateLabel: dayjs().format("dddd, DD MMMM YYYY"),
+  //     expenses,
+  //     incomes
+  //   });
+  // };
+
   if (!transactions.length) {
     return (
       <div className="space-y-4">
@@ -157,7 +190,15 @@ export function ReportsPage() {
             />
           </div>
 
-          <div className="flex items-end gap-2">
+          {/* <div className="flex items-end gap-2">
+            <Button
+              size="large"
+              className="w-full"
+              onClick={handleOpenDailyInvoice}
+              disabled={!invoiceMemberId}
+            >
+              Cetak PDF harian
+            </Button>
             <Button
               type="primary"
               size="large"
@@ -172,7 +213,7 @@ export function ReportsPage() {
             >
               Export Excel
             </Button>
-          </div>
+          </div> */}
         </div>
 
         <Typography.Paragraph className="!mb-0 !mt-3 !text-[12px] !leading-5 !text-muted">
@@ -451,6 +492,16 @@ export function ReportsPage() {
       />
     </div>
   );
+}
+
+function mapTransactionToInvoiceRow(item) {
+  return {
+    title: item.title || item.categoryName || "Transaksi",
+    note: item.note || item.description || "-",
+    category: item.categoryName || "-",
+    time: item.date ? `${formatDate(item.date)}${item.createdAt?.seconds ? ` ${dayjs.unix(item.createdAt.seconds).format("HH:mm")}` : ""}` : "-",
+    amount: Number(item.amount || 0)
+  };
 }
 
 function MonthlyDetailModal({ detail, activeMemberId, onClose }) {

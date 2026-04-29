@@ -197,8 +197,22 @@ export async function updateSavingGoal(familyId, goalId, payload) {
   });
 }
 
+export async function updateSavingContribution(familyId, contributionId, payload) {
+  return updateDoc(doc(db, "families", familyId, "savingContributions", contributionId), {
+    ...payload,
+    updatedAt: serverTimestamp()
+  });
+}
+
 export async function updateFinanceRecord(familyId, recordId, payload) {
   return updateDoc(doc(db, "families", familyId, "financeRecords", recordId), {
+    ...payload,
+    updatedAt: serverTimestamp()
+  });
+}
+
+export async function updateFinancePayment(familyId, paymentId, payload) {
+  return updateDoc(doc(db, "families", familyId, "financePayments", paymentId), {
     ...payload,
     updatedAt: serverTimestamp()
   });

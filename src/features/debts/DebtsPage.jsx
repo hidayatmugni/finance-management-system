@@ -21,6 +21,7 @@ export function DebtsPage() {
   const members = useFinanceStore((state) => state.members);
   const { user } = useAuth();
   const [recordType, setRecordType] = useState("debt");
+  const [assetKind, setAssetKind] = useState("goods");
   const [personName, setPersonName] = useState("");
   const [amountInitial, setAmountInitial] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("installment");
@@ -51,6 +52,17 @@ export function DebtsPage() {
     return member?.fullName || member?.name || user?.displayName || user?.email || "Tanpa nama";
   }, [members, user?.displayName, user?.email, user?.uid]);
 
+  const payableRecordOptions = useMemo(
+    () =>
+      financeRecords
+        .filter((item) => item.status !== "paid")
+        .map((record) => ({
+          value: record.id,
+          label: record.personName || "Tanpa nama"
+        })),
+    [financeRecords],
+  );
+
   const handleCreateRecord = async () => {
     setRecordAlert(null);
     if (!family?.id || !personName.trim() || !amountInitial || !dueDate) {
@@ -67,11 +79,14 @@ export function DebtsPage() {
       const startDate = new Date().toISOString().slice(0, 10);
       const cleanPersonName = personName.trim();
       const isDebt = recordType === "debt";
+      const normalizedAssetKind = normalizeFinanceAssetKind(assetKind);
+      const shouldTrackInitialCashflow = normalizedAssetKind === "money";
 
       const recordRef = await createFinanceRecord(family.id, {
         familyId: family.id,
         userId: user?.uid || "",
         recordType,
+        assetKind: normalizedAssetKind,
         personName: cleanPersonName,
         amountInitial: initialAmount,
         amountRemaining: initialAmount,
@@ -86,36 +101,43 @@ export function DebtsPage() {
         note: ""
       });
 
-      await createTransaction({
-        familyId: family.id,
-        payload: {
+      if (shouldTrackInitialCashflow) {
+        await createTransaction({
           familyId: family.id,
-          userId: user?.uid || "",
-          createdBy: user?.uid || "",
-          ownershipType: "shared",
-          type: isDebt ? "income" : "expense",
-          categoryId: isDebt ? "lainnya_income" : "lainnya_expense",
-          accountId: null,
-          amount: initialAmount,
-          date: startDate,
-          note: isDebt ? `Pencairan hutang dari ${cleanPersonName}` : `Memberi piutang ke ${cleanPersonName}`,
-          tags: [isDebt ? "hutang_awal" : "piutang_awal"],
-          syncStatus: "synced",
-          title: isDebt ? `Hutang dari ${cleanPersonName}` : `Piutang ke ${cleanPersonName}`,
-          memberName,
-          categoryName: "Lainnya",
-          sourceModule: "finance-record",
-          relatedFinanceRecordId: recordRef.id
-        }
-      });
+          payload: {
+            familyId: family.id,
+            userId: user?.uid || "",
+            createdBy: user?.uid || "",
+            ownershipType: "shared",
+            type: isDebt ? "income" : "expense",
+            categoryId: isDebt ? "lainnya_income" : "lainnya_expense",
+            accountId: null,
+            amount: initialAmount,
+            date: startDate,
+            note: isDebt ? `Pencairan hutang dari ${cleanPersonName}` : `Memberi piutang ke ${cleanPersonName}`,
+            tags: [isDebt ? "hutang_awal" : "piutang_awal"],
+            syncStatus: "synced",
+            title: isDebt ? `Hutang dari ${cleanPersonName}` : `Piutang ke ${cleanPersonName}`,
+            memberName,
+            categoryName: "Lainnya",
+            sourceModule: "finance-record",
+            financeRecordType: recordType,
+            financeAssetKind: normalizedAssetKind,
+            relatedFinanceRecordId: recordRef.id
+          }
+        });
+      }
 
+      setAssetKind("goods");
       setPersonName("");
       setAmountInitial("");
       setInstallmentMonths("12");
       setDueDate("");
       setRecordAlert({
         type: "success",
-        title: "Data hutang atau piutang berhasil disimpan dan arus kas awal ikut tercatat."
+        title: shouldTrackInitialCashflow
+          ? "Data hutang atau piutang berhasil disimpan dan arus kas awal ikut tercatat."
+          : "Data hutang atau piutang barang berhasil disimpan tanpa menambah arus kas awal."
       });
     } catch (error) {
       setRecordAlert({
@@ -143,10 +165,13 @@ export function DebtsPage() {
       const nextPaymentCount = Number(record.paymentCount || 0) + 1;
       const nextStatus = nextRemaining <= 0 ? "paid" : "active";
       const isDebt = record.recordType === "debt";
+      const normalizedAssetKind = normalizeFinanceAssetKind(record.assetKind);
 
       await createFinancePayment(family.id, {
         familyId: family.id,
         financeRecordId: record.id,
+        recordType: record.recordType,
+        assetKind: normalizedAssetKind,
         userId: user?.uid || "",
         amount,
         paymentDate,
@@ -180,6 +205,8 @@ export function DebtsPage() {
           memberName,
           categoryName: isDebt ? "Tagihan" : "Lainnya",
           sourceModule: "finance-record",
+          financeRecordType: record.recordType,
+          financeAssetKind: normalizedAssetKind,
           relatedFinanceRecordId: record.id
         }
       });
@@ -226,6 +253,15 @@ export function DebtsPage() {
             options={[
               { value: "debt", label: "Hutang" },
               { value: "receivable", label: "Piutang" }
+            ]}
+          />
+          <Select
+            value={assetKind}
+            onChange={setAssetKind}
+            size="large"
+            options={[
+              { value: "goods", label: "Barang / kredit barang" },
+              { value: "money", label: "Uang / tunai" }
             ]}
           />
           <Input
@@ -296,13 +332,11 @@ export function DebtsPage() {
             value={activeRecordId || undefined}
             onChange={setActiveRecordId}
             size="large"
+            showSearch
+            optionFilterProp="label"
             placeholder="Pilih data hutang / piutang"
-            options={financeRecords
-              .filter((item) => item.status !== "paid")
-              .map((record) => ({
-                value: record.id,
-                label: `${record.recordType === "debt" ? "Hutang" : "Piutang"} - ${record.personName}`
-              }))}
+            options={payableRecordOptions}
+            className="w-full"
           />
           <div className="grid grid-cols-2 gap-2">
             <InputNumber
@@ -362,9 +396,9 @@ export function DebtsPage() {
                 dataIndex: "recordType",
                 width: 88,
                 render: (value) => (
-                  <Tag className={`rounded-full border-0 px-2.5 py-0.5 text-[11px] font-semibold ${getFinanceTypeTagClass(value)}`}>
-                    {value === "debt" ? "Hutang" : "Piutang"}
-                  </Tag>
+                  <Typography.Text className={`!text-[12px] !font-semibold ${getFinanceTypeTextClass(value)}`}>
+                    {getFinanceTypeLabel(value)}
+                  </Typography.Text>
                 )
               },
               {
@@ -434,6 +468,36 @@ function FinanceDetailModal({ record, payments, onClose }) {
     ? Math.min((Number(record.totalPaid || 0) / Number(record.amountInitial || 1)) * 100, 100)
     : 0;
 
+  if (!record) return null;
+
+  const summaryItems = [
+    {
+      label: "Sisa",
+      value: formatCurrency(record.amountRemaining),
+      highlight: true,
+    },
+    {
+      label: "Terbayar",
+      value: formatCurrency(record.totalPaid || 0),
+    },
+    {
+      label: "Cicilan",
+      value: `${record.paymentCount || 0}/${record.installmentMonths || 1} kali`,
+    },
+    {
+      label: "Awal",
+      value: formatCurrency(record.amountInitial),
+    },
+    {
+      label: "Bentuk",
+      value: getFinanceAssetKindLabel(record.assetKind),
+    },
+    {
+      label: "Due",
+      value: formatDate(record.dueDate),
+    },
+  ];
+
   return (
     <Modal
       open={open}
@@ -441,79 +505,137 @@ function FinanceDetailModal({ record, payments, onClose }) {
       footer={null}
       title={null}
       centered
-      width={420}
-      styles={{ content: { background: themePalette.colors.panel, padding: 16 }, body: { padding: 0 } }}
+      width={390}
+      styles={{
+        content: {
+          background: themePalette.colors.panel,
+          padding: 14,
+          borderRadius: 18,
+        },
+        body: { padding: 0 },
+      }}
     >
-      {record ? (
-        <Space orientation="vertical" size={12} className="w-full">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <Typography.Title level={4} className="!mb-0 !text-[15px]">
-                {record.personName}
-              </Typography.Title>
-              <Typography.Text className="mt-1 block !text-[12px] !text-muted">
-                {record.recordType === "debt" ? "Hutang ke orang" : "Piutang ke orang"} | Jatuh tempo {formatDate(record.dueDate)}
-              </Typography.Text>
-            </div>
-            <Tag className={`rounded-full border-0 px-3 py-1 text-xs font-semibold ${getFinanceStatusTagClass(record.status)}`}>
-              {getFinanceStatusLabel(record.status)}
-            </Tag>
-          </div>
+      <div className="space-y-3">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <Typography.Title level={5} className="!mb-0 truncate !text-[15px]">
+              {record.personName}
+            </Typography.Title>
 
-          <div className="grid grid-cols-2 gap-2">
-            <DetailInfo label="Sisa" value={formatCurrency(record.amountRemaining)} />
-            <DetailInfo label="Sudah dibayar" value={formatCurrency(record.totalPaid || 0)} />
-            <DetailInfo label="Progress cicilan" value={`${record.paymentCount || 0} / ${record.installmentMonths || 1} kali`} />
-            <DetailInfo label="Nominal awal" value={formatCurrency(record.amountInitial)} />
-          </div>
-
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between gap-3">
-              <Typography.Text className="text-[11px] font-medium text-muted">
-                Terbayar {formatCurrency(record.totalPaid || 0)} dari {formatCurrency(record.amountInitial || 0)}
-              </Typography.Text>
-            </div>
-            <Progress
-              percent={Math.round(paidPercent)}
-              strokeColor={themePalette.colors.primaryStrong}
-              railColor={themePalette.colors.progressRail}
-            />
-          </div>
-
-          <div>
-            <Typography.Text className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
-              Riwayat pembayaran
+            <Typography.Text className="mt-0.5 block !text-[11px] !text-muted">
+              {record.recordType === "debt" ? "Hutang" : "Piutang"} · Jatuh tempo {formatDate(record.dueDate)}
             </Typography.Text>
-            <div className="mt-2.5 max-h-[248px] overflow-y-auto rounded-[12px] border border-line">
-              {payments.length ? (
-                payments.map((payment, index) => (
-                  <div
-                    key={payment.id}
-                    className={`bg-panel px-3 py-2 ${index === payments.length - 1 ? "" : "border-b border-line"}`}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <Typography.Text strong className="!text-[13px] !font-semibold">
-                        Pembayaran ke-{payment.paymentNumber || "-"}
+          </div>
+
+          <Tag
+            className={`shrink-0 rounded-full border-0 px-2.5 py-0.5 text-[11px] font-semibold ${getFinanceStatusTagClass(
+              record.status,
+            )}`}
+          >
+            {getFinanceStatusLabel(record.status)}
+          </Tag>
+        </div>
+
+        {/* Summary */}
+        <div className="grid grid-cols-2 gap-x-3 gap-y-2 rounded-2xl border border-line bg-panel/60 p-3">
+          {summaryItems.map((item) => (
+            <div
+              key={item.label}
+              className={`min-w-0 rounded-xl px-2 py-1.5 ${
+                item.highlight
+                  ? "bg-red-500/10" // bisa disesuaikan dengan theme
+                  : ""
+              }`}
+            >
+              <Typography.Text className="block !text-[10px] uppercase tracking-[0.08em] !text-muted">
+                {item.label}
+              </Typography.Text>
+
+              <Typography.Text
+                className={`block truncate !text-[12px] ${
+                  item.highlight ? "font-semibold text-red-500" : ""
+                }`}
+              >
+                {item.value}
+              </Typography.Text>
+            </div>
+          ))}
+        </div>
+
+        {/* Progress */}
+        <div className="rounded-2xl border border-line bg-panel/60 p-3">
+          <div className="mb-1.5 flex items-center justify-between gap-3">
+            <Typography.Text className="!text-[11px] !text-muted">
+              Progress pembayaran
+            </Typography.Text>
+            <Typography.Text className="!text-[11px] font-semibold">
+              {Math.round(paidPercent)}%
+            </Typography.Text>
+          </div>
+
+          <Progress
+            percent={Math.round(paidPercent)}
+            showInfo={false}
+            size="small"
+            strokeColor={themePalette.colors.primaryStrong}
+            railColor={themePalette.colors.progressRail}
+          />
+
+          <Typography.Text className="mt-1.5 block !text-[11px] !text-muted">
+            {formatCurrency(record.totalPaid || 0)} / {formatCurrency(record.amountInitial || 0)}
+          </Typography.Text>
+        </div>
+
+        {/* Payment History */}
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <Typography.Text className="!text-[11px] font-semibold uppercase tracking-[0.12em] !text-muted">
+              Riwayat
+            </Typography.Text>
+            <Typography.Text className="!text-[11px] !text-muted">
+              {payments.length} pembayaran
+            </Typography.Text>
+          </div>
+
+          <div className="max-h-[210px] overflow-y-auto rounded-2xl border border-line">
+            {payments.length ? (
+              payments.map((payment, index) => (
+                <div
+                  key={payment.id}
+                  className={`bg-panel px-3 py-2 ${
+                    index === payments.length - 1 ? "" : "border-b border-line"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <Typography.Text className="block truncate !text-[12px] font-semibold">
+                        {formatCurrency(payment.amount)}
                       </Typography.Text>
-                      <Typography.Text className="!text-[11px] !text-muted">
-                        {formatDate(payment.paymentDate)}
+                      <Typography.Text className="block truncate !text-[11px] !text-muted">
+                        #{payment.paymentNumber || "-"} · {payment.note || "Tanpa catatan"}
                       </Typography.Text>
                     </div>
-                    <Typography.Text strong className="mt-0.5 block !text-[13px]">
-                      {formatCurrency(payment.amount)}
-                    </Typography.Text>
-                    <Typography.Text className="mt-0.5 block !text-[12px] !text-muted">
-                      {payment.note || "Tanpa catatan"}
+
+                    <Typography.Text className="shrink-0 !text-[11px] !text-muted">
+                      {formatDate(payment.paymentDate)}
                     </Typography.Text>
                   </div>
-                ))
-              ) : (
-                <Alert type="info" showIcon title="Belum ada pembayaran tercatat." />
-              )}
-            </div>
+                </div>
+              ))
+            ) : (
+              <div className="p-3">
+                <Alert
+                  type="info"
+                  showIcon
+                  message="Belum ada pembayaran."
+                  className="!py-2"
+                />
+              </div>
+            )}
           </div>
-        </Space>
-      ) : null}
+        </div>
+      </div>
     </Modal>
   );
 }
@@ -565,11 +687,40 @@ function getFinanceStatusTextClass(status) {
   }
 }
 
-function getFinanceTypeTagClass(recordType) {
+function getFinanceTypeTextClass(recordType) {
   switch (recordType) {
     case "debt":
-      return "bg-expense/15 text-expense";
+      return "!text-expense";
     default:
-      return "bg-income/15 text-income";
+      return "!text-income";
+  }
+}
+
+function getFinanceTypeLabel(recordType) {
+  return recordType === "debt" ? "Hutang" : "Piutang";
+}
+
+function normalizeFinanceAssetKind(assetKind) {
+  const normalizedValue = String(assetKind || "").trim().toLowerCase();
+
+  if (["goods", "barang", "item", "product", "produk"].includes(normalizedValue)) {
+    return "goods";
+  }
+
+  if (["money", "uang", "duit", "cash", "tunai"].includes(normalizedValue)) {
+    return "money";
+  }
+
+  return "unknown";
+}
+
+function getFinanceAssetKindLabel(assetKind) {
+  switch (normalizeFinanceAssetKind(assetKind)) {
+    case "goods":
+      return "Barang";
+    case "money":
+      return "Uang";
+    default:
+      return "Belum dipilih";
   }
 }

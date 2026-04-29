@@ -15,11 +15,21 @@ export function TransactionList({ items, pageSize = 6, minHeight = 360 }) {
     setPage(1);
   }, [items, effectivePageSize, pageSize]);
 
+  const sortedItems = useMemo(
+    () =>
+      [...items].sort((firstItem, secondItem) => {
+        const firstDate = getDateTime(firstItem.date);
+        const secondDate = getDateTime(secondItem.date);
+        return secondDate - firstDate;
+      }),
+    [items],
+  );
+
   const pagedItems = useMemo(() => {
     const currentPageSize = Math.min(pageSize, effectivePageSize);
     const startIndex = (page - 1) * currentPageSize;
-    return items.slice(startIndex, startIndex + currentPageSize);
-  }, [effectivePageSize, items, page, pageSize]);
+    return sortedItems.slice(startIndex, startIndex + currentPageSize);
+  }, [effectivePageSize, page, pageSize, sortedItems]);
 
   const finalPageSize = Math.min(pageSize, effectivePageSize);
 
@@ -42,7 +52,7 @@ export function TransactionList({ items, pageSize = 6, minHeight = 360 }) {
   }
   return (
     <Card className="finance-card">
-      {items.length ? (
+      {sortedItems.length ? (
         <>
           <div style={{ minHeight }}>
             <Space orientation="vertical" size={10} className="w-full">
@@ -63,10 +73,10 @@ export function TransactionList({ items, pageSize = 6, minHeight = 360 }) {
                     </div>
                     <div className="min-w-0">
                       <Typography.Text strong className="block !text-[12px] !font-semibold !text-ink">
-                        {truncateText(item.title, 28)}
+                        {truncateText(item.categoryName, 28)}
                       </Typography.Text>
                       <Typography.Text className="mt-0.5 block !text-[10px] !text-muted">
-                        {truncateText(item.memberName || "-", 10)} | {truncateText(item.categoryName || "-", 10)} | {formatDate(item.date)}
+                        {truncateText(item.note || "-", 35)} |  {formatDate(item.date)}
                       </Typography.Text>
                     </div>
                   </div>
@@ -96,12 +106,12 @@ export function TransactionList({ items, pageSize = 6, minHeight = 360 }) {
             </Space>
           </div>
 
-          {items.length > finalPageSize ? (
+          {sortedItems.length > finalPageSize ? (
             <div className="mt-3 flex justify-end">
               <Pagination
                 current={page}
                 pageSize={finalPageSize}
-                total={items.length}
+                total={sortedItems.length}
                 size="small"
                 showSizeChanger={false}
                 onChange={setPage}
@@ -122,6 +132,12 @@ export function TransactionList({ items, pageSize = 6, minHeight = 360 }) {
 function truncateText(value, maxLength) {
   if (!value) return "-";
   return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
+}
+
+function getDateTime(value) {
+  if (!value) return 0;
+  const parsedDate = Date.parse(value);
+  return Number.isNaN(parsedDate) ? 0 : parsedDate;
 }
 
 function getInitials(value) {

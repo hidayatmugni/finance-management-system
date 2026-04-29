@@ -6,7 +6,8 @@ import {
   onSnapshot,
   orderBy,
   query,
-  serverTimestamp
+  serverTimestamp,
+  updateDoc
 } from "firebase/firestore";
 import { db } from "./client.js";
 
@@ -33,6 +34,13 @@ export async function createTransaction({ familyId, payload }) {
   return addDoc(transactionsRef, {
     ...payload,
     createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  });
+}
+
+export async function updateTransaction({ familyId, transactionId, payload }) {
+  return updateDoc(doc(db, "families", familyId, "transactions", transactionId), {
+    ...payload,
     updatedAt: serverTimestamp()
   });
 }
