@@ -244,10 +244,17 @@ export function AddTransactionPage() {
             </Field>
 
             <Field label="Keterangan" error={errors.note?.message}>
-              <Input.TextArea
-                {...register("note")}
-                autoSize={{ minRows: 3, maxRows: 5 }}
-                placeholder={`Contoh: ${selectedType === JENIS_ARUS_KAS.PENGELUARAN ? "Belanja sayur dan lauk untuk hari ini" : "Bayaran proyek desain bulan ini"}`}
+              <Controller
+                name="note"
+                control={control}
+                render={({ field }) => (
+                  <Input.TextArea
+                    {...field}
+                    value={field.value || ""}
+                    autoSize={{ minRows: 3, maxRows: 5 }}
+                    placeholder={`Contoh: ${selectedType === JENIS_ARUS_KAS.PENGELUARAN ? "Belanja sayur dan lauk untuk hari ini" : "Bayaran proyek desain bulan ini"}`}
+                  />
+                )}
               />
             </Field>
 

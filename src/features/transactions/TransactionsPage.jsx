@@ -1,7 +1,7 @@
 import dayjs from "dayjs";
 import { ArrowDownOutlined, ArrowUpOutlined } from "@ant-design/icons";
-import { Card, DatePicker, Form, Select, Table, Typography } from "antd";
-import { useMemo } from "react";
+import { Card, DatePicker, Form, Select,Modal, Table, Typography } from "antd";
+import { useMemo, useState  } from "react";
 import { useFinanceStore } from "../../shared/state/useFinanceStore";
 import { EmptyState } from "../../shared/components/EmptyState";
 import { SectionHeading } from "../../shared/components/SectionHeading";
@@ -15,6 +15,8 @@ export function TransactionsPage() {
   const members = useFinanceStore((state) => state.members);
   const filters = useFinanceStore((state) => state.filters);
   const setFilters = useFinanceStore((state) => state.setFilters);
+
+  const [selectedTransaction, setSelectedTransaction] = useState(null);
 
   const startDate = filters.startDate || "";
   const endDate = filters.endDate || "";
@@ -160,6 +162,10 @@ export function TransactionsPage() {
           }}
           dataSource={displayTransactions}
           locale={{ emptyText: "Tidak ada data pada filter yang dipilih." }}
+          onRow={(record) => ({
+            onClick: () => setSelectedTransaction(record),
+            className: "cursor-pointer",
+          })}
           columns={[
             {
               title: "Tanggal",
@@ -223,6 +229,92 @@ export function TransactionsPage() {
           ]}
         />
       </Card>
+
+      <TransactionDetailModal
+        transaction={selectedTransaction}
+        onClose={() => setSelectedTransaction(null)}
+      />
+          </div>
+  );
+}
+function TransactionDetailModal({ transaction, onClose }) {
+  const open = Boolean(transaction);
+
+  if (!transaction) return null;
+
+  const isIncome = transaction.type === JENIS_ARUS_KAS.PEMASUKAN;
+  const toneColor = isIncome ? themePalette.colors.success : themePalette.colors.expense;
+
+  return (
+    <Modal
+      open={open}
+      onCancel={onClose}
+      footer={null}
+      title={null}
+      centered
+      width={360}
+      styles={{
+        content: {
+          background: themePalette.colors.panel,
+          padding: 14,
+          borderRadius: 18,
+        },
+        body: { padding: 0 },
+      }}
+    >
+      <div className="space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <Typography.Text className="block !text-[11px] uppercase tracking-[0.12em] !text-muted">
+              Detail transaksi
+            </Typography.Text>
+
+            <Typography.Title level={4} className="!mb-0 !mt-1 !text-[18px] !font-bold">
+              {formatCurrency(transaction.amount)}
+            </Typography.Title>
+          </div>
+
+          <span
+            className="rounded-full px-2.5 py-1 text-[11px] font-semibold"
+            style={{
+              background: `${toneColor}1f`,
+              color: toneColor,
+            }}
+          >
+            {isIncome ? "Pemasukan" : "Pengeluaran"}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 rounded-2xl border border-line bg-panel/60 p-3">
+          <DetailItem label="Tanggal" value={formatDate(transaction.date)} />
+          <DetailItem label="User" value={transaction.memberName || "-"} />
+          <DetailItem label="Kategori" value={transaction.categoryName || "-"} />
+          <DetailItem label="Nominal" value={formatCurrency(transaction.amount)} />
+        </div>
+
+        <div className="rounded-2xl border border-line bg-panel/60 p-3">
+          <Typography.Text className="block !text-[10px] uppercase tracking-[0.12em] !text-muted">
+            Keterangan
+          </Typography.Text>
+
+          <Typography.Text className="mt-1 block whitespace-pre-line !text-[13px] !text-ink">
+            {transaction.note || "Tidak ada keterangan."}
+          </Typography.Text>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function DetailItem({ label, value }) {
+  return (
+    <div className="min-w-0">
+      <Typography.Text className="block !text-[10px] uppercase tracking-[0.08em] !text-muted">
+        {label}
+      </Typography.Text>
+      <Typography.Text className="block truncate !text-[12px] !font-medium !text-ink">
+        {value}
+      </Typography.Text>
     </div>
   );
 }

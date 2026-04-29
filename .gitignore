@@ -7,3 +7,5 @@ dist
 .env.*.local
 .firebase
 functions/.env
+
+finance-management-syste-32d87-firebase-adminsdk-fbsvc-a11ece25b8.json
