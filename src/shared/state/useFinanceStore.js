@@ -1,4 +1,17 @@
 import { create } from "zustand";
+import { getCurrentBookMonthRange } from "../utils/dateFilters";
+
+function createDefaultFilters() {
+  const { startDate, endDate } = getCurrentBookMonthRange();
+
+  return {
+    activeMemberId: "all",
+    startDate,
+    endDate,
+    type: "all",
+    categoryId: "all"
+  };
+}
 
 export const useFinanceStore = create((set) => ({
   family: null,
@@ -10,13 +23,7 @@ export const useFinanceStore = create((set) => ({
   financeRecords: [],
   financePayments: [],
   transactions: [],
-  filters: {
-    activeMemberId: "all",
-    startDate: "",
-    endDate: "",
-    type: "all",
-    categoryId: "all"
-  },
+  filters: createDefaultFilters(),
   setFamily: (family) => set({ family }),
   setMembers: (members) => set({ members }),
   setAccounts: (accounts) => set({ accounts }),
@@ -38,13 +45,7 @@ export const useFinanceStore = create((set) => ({
       financeRecords: [],
       financePayments: [],
       transactions: [],
-      filters: {
-        activeMemberId: "all",
-        startDate: "",
-        endDate: "",
-        type: "all",
-        categoryId: "all"
-      }
+      filters: createDefaultFilters()
     }),
   addTransaction: (transaction) =>
     set((state) => ({

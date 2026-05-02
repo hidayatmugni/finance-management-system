@@ -23,8 +23,9 @@ import { SectionHeading } from "../../shared/components/SectionHeading";
 import { MetricCard } from "../../shared/components/MetricCard";
 import { TransactionList } from "../../shared/components/TransactionList";
 import { EmptyState } from "../../shared/components/EmptyState";
-import { formatAxisCurrency, formatCurrency } from "../../shared/utils/format";
+import { formatAxisCurrency, formatCurrency, formatDate } from "../../shared/utils/format";
 import { themePalette } from "../../shared/config/themePalette";
+import { getCurrentBookMonthRange, inDateRange } from "../../shared/utils/dateFilters";
 import {
   buildCategoryBreakdown,
   buildCurrentMonthDailyTrend,
@@ -40,10 +41,10 @@ export function DashboardPage() {
   const savingsGoals = useFinanceStore((state) => state.savingsGoals);
   const financeRecords = useFinanceStore((state) => state.financeRecords);
   const now = dayjs();
+  const currentBookRange = getCurrentBookMonthRange(now);
+  const currentBookPeriodLabel = `${formatDate(currentBookRange.startDate)} - ${formatDate(currentBookRange.endDate)}`;
   const currentMonthTransactions = transactions.filter((item) => {
-    if (!item.date) return false;
-    const date = dayjs(item.date);
-    return date.year() === now.year() && date.month() === now.month();
+    return inDateRange(item.date, currentBookRange.startDate, currentBookRange.endDate);
   });
   const recentWeeklyTransactions = currentMonthTransactions
     .filter((item) => item.date && dayjs(item.date).isAfter(now.subtract(7, "day").startOf("day")))
@@ -72,7 +73,12 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-4">
-      <SectionHeading title="Ringkasan Bulan Ini" />
+      <div>
+        <SectionHeading title="Ringkasan Bulan Ini" />
+        <Typography.Text className="mt-1 block !text-[11px] !text-muted">
+          Periode tutup buku: {currentBookPeriodLabel}
+        </Typography.Text>
+      </div>
 
       <div className="grid grid-cols-2 gap-3">
         <MetricCard label="Pemasukan" value={dashboardSummary.incomeMonth} tone="income" />
@@ -97,7 +103,7 @@ export function DashboardPage() {
       <section className="space-y-3">
         <SectionHeading eyebrow="Terbaru" title="Transaksi terakhir" />
         <Typography.Text className="block !text-[11px] !text-muted">
-          Menampilkan transaksi 7 hari terakhir pada bulan ini.
+          Menampilkan transaksi 7 hari terakhir pada periode berjalan.
         </Typography.Text>
         <TransactionList items={recentWeeklyTransactions} pageSize={8} minHeight={420} />
       </section>
@@ -204,7 +210,7 @@ export function DashboardPage() {
                       {item.name}
                     </Typography.Text>
                     <Typography.Text className="!text-[11px] !text-muted">
-                      {item.count} transaksi bulan ini
+                      {item.count} transaksi periode ini
                     </Typography.Text>
                   </div>
                   <Typography.Text className="!text-[12px] !font-semibold !text-primary">

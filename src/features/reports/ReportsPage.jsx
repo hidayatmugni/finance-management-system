@@ -30,6 +30,7 @@ import {
   formatCurrency,
   formatDate
 } from "../../shared/utils/format";
+import { getBookMonthFromDate, getBookMonthRange, inDateRange, isInBookYear } from "../../shared/utils/dateFilters";
 import { themePalette } from "../../shared/config/themePalette";
 import { useAuth } from "../auth/AuthProvider";
 // import { openDailyInvoicePrint } from "../../shared/utils/dailyInvoice";
@@ -37,6 +38,7 @@ import { useAuth } from "../auth/AuthProvider";
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 
 export function ReportsPage() {
+  const currentBookMonth = getBookMonthFromDate();
   const family = useFinanceStore((state) => state.family);
   const members = useFinanceStore((state) => state.members);
   const transactions = useFinanceStore((state) => state.transactions);
@@ -44,7 +46,7 @@ export function ReportsPage() {
   const financePayments = useFinanceStore((state) => state.financePayments);
   const financeRecords = useFinanceStore((state) => state.financeRecords);
   const { user } = useAuth();
-  const [selectedYear, setSelectedYear] = useState(String(dayjs().year()));
+  const [selectedYear, setSelectedYear] = useState(String(currentBookMonth.year));
   const [activeMemberId, setActiveMemberId] = useState("all");
   const [selectedMonth, setSelectedMonth] = useState(null);
 
@@ -164,7 +166,7 @@ export function ReportsPage() {
             <DatePicker
               picker="year"
               value={selectedYear ? dayjs(`${selectedYear}-01-01`) : null}
-              onChange={(value) => setSelectedYear(value ? String(value.year()) : String(dayjs().year()))}
+              onChange={(value) => setSelectedYear(value ? String(value.year()) : String(currentBookMonth.year))}
               size="large"
               className="mt-2 !w-full"
               format="YYYY"
@@ -190,15 +192,7 @@ export function ReportsPage() {
             />
           </div>
 
-          {/* <div className="flex items-end gap-2">
-            <Button
-              size="large"
-              className="w-full"
-              onClick={handleOpenDailyInvoice}
-              disabled={!invoiceMemberId}
-            >
-              Cetak PDF harian
-            </Button>
+          <div className="flex items-end gap-2">
             <Button
               type="primary"
               size="large"
@@ -213,11 +207,11 @@ export function ReportsPage() {
             >
               Export Excel
             </Button>
-          </div> */}
+          </div>
         </div>
 
         <Typography.Paragraph className="!mb-0 !mt-3 !text-[12px] !leading-5 !text-muted">
-           Anda bisa filter per user untuk melihat tren pemasukan, pengeluaran, tabungan, dan pembayaran hutang dengan lebih fokus.
+           Anda bisa filter per user untuk melihat tren pemasukan, pengeluaran, tabungan, dan pembayaran hutang dengan lebih fokus. Setiap bulan mengikuti periode tutup buku tanggal 27 sampai 26.
         </Typography.Paragraph>
 
         <Link to="/dashboard/admin" className="mt-3 inline-block !no-underline">
@@ -240,7 +234,7 @@ export function ReportsPage() {
       <Card className="finance-card">
         <SectionHeading eyebrow="Pergerakan" title={`Comparison per bulan ${selectedYear}`} />
         <Typography.Paragraph className="!mb-0 !mt-1 !text-[12px] !leading-5 !text-muted">
-          Grafik ini menampilkan pergerakan pemasukan, pengeluaran, dan arus kas bersih dari Januari sampai Desember pada tahun yang dipilih.
+          Grafik ini menampilkan pergerakan pemasukan, pengeluaran, dan arus kas bersih dari Januari sampai Desember pada tahun yang dipilih, dengan range 27 bulan sebelumnya sampai 26 bulan berjalan.
         </Typography.Paragraph>
         <div className="mt-4 h-64">
           <ResponsiveContainer width="100%" height="100%">
@@ -259,7 +253,10 @@ export function ReportsPage() {
                 tick={{ fill: themePalette.colors.muted, fontSize: 11 }}
                 tickFormatter={(value) => formatCompactCurrency(value)}
               />
-              <Tooltip formatter={(value) => formatCurrency(value)} />
+              <Tooltip
+                formatter={(value) => formatCurrency(value)}
+                labelFormatter={(label, payload) => payload?.[0]?.payload?.periodLabel || label}
+              />
               <Legend
                 verticalAlign="top"
                 height={24}
@@ -426,6 +423,9 @@ export function ReportsPage() {
                     <Typography.Text strong className="!block !text-[13px] !font-semibold !text-ink">
                       {item.month}
                     </Typography.Text>
+                    <Typography.Text className="!mt-1 !block !text-[10px] !text-muted">
+                      {item.periodLabel}
+                    </Typography.Text>
                     <Typography.Text className={`!mt-1 !block !text-[11px] !font-semibold ${netPositive ? "!text-income" : "!text-expense"}`}>
                       {netPositive ? "Surplus" : "Defisit"} {formatCompactCurrency(Math.abs(item.net))}
                     </Typography.Text>
@@ -525,6 +525,9 @@ function MonthlyDetailModal({ detail, activeMemberId, onClose }) {
                 Detail {detail.month} {detail.year}
               </Typography.Title>
               <Typography.Text className="mt-1 block !text-[12px] !text-muted">
+                {formatDate(detail.startDate)} - {formatDate(detail.endDate)}
+              </Typography.Text>
+              <Typography.Text className="mt-1 block !text-[11px] !text-muted">
                 {activeMemberId === "all" ? "Global keluarga" : "Filter user aktif"}
               </Typography.Text>
             </div>
@@ -565,8 +568,7 @@ function filterByYearAndUser(items, dateField, year, userId) {
   return items.filter((item) => {
     const dateValue = item[dateField];
     if (!dateValue) return false;
-    const date = dayjs(dateValue);
-    const matchYear = date.year() === year;
+    const matchYear = isInBookYear(dateValue, year);
     const matchUser = userId === "all" ? true : item.userId === userId;
     return matchYear && matchUser;
   });
@@ -574,9 +576,10 @@ function filterByYearAndUser(items, dateField, year, userId) {
 
 function buildMonthlyReportDataset({ year, transactions, savingContributions, financePayments, financeRecordMap }) {
   return MONTH_LABELS.map((month, monthIndex) => {
-    const monthTransactions = transactions.filter((item) => dayjs(item.date).year() === year && dayjs(item.date).month() === monthIndex);
-    const monthSavings = savingContributions.filter((item) => dayjs(item.date).year() === year && dayjs(item.date).month() === monthIndex);
-    const monthPayments = financePayments.filter((item) => dayjs(item.paymentDate).year() === year && dayjs(item.paymentDate).month() === monthIndex);
+    const range = getBookMonthRange(year, monthIndex);
+    const monthTransactions = transactions.filter((item) => inDateRange(item.date, range.startDate, range.endDate));
+    const monthSavings = savingContributions.filter((item) => inDateRange(item.date, range.startDate, range.endDate));
+    const monthPayments = financePayments.filter((item) => inDateRange(item.paymentDate, range.startDate, range.endDate));
 
     const income = sumAmount(monthTransactions.filter((item) => item.type === "income"));
     const expense = sumAmount(monthTransactions.filter((item) => item.type === "expense"));
@@ -590,6 +593,9 @@ function buildMonthlyReportDataset({ year, transactions, savingContributions, fi
       month,
       monthIndex,
       year,
+      startDate: range.startDate,
+      endDate: range.endDate,
+      periodLabel: `${formatDate(range.startDate, "DD MMM")} - ${formatDate(range.endDate, "DD MMM")}`,
       income,
       expense,
       net: income - expense,
