@@ -1,20 +1,26 @@
 import dayjs from "dayjs";
+import {
+  getBookMonthFromDate,
+  getBookMonthRange,
+  inDateRange,
+  isInBookMonth,
+  isInBookYear
+} from "./dateFilters";
 
 function sumAmount(items) {
   return items.reduce((total, item) => total + Number(item.amount || 0), 0);
 }
 
 export function buildFinanceSummary(transactions, options = {}) {
-  const now = dayjs();
-  const targetYear = options.year ?? now.year();
-  const targetMonth = options.month ?? now.month();
+  const currentBookMonth = getBookMonthFromDate();
+  const targetYear = options.year ?? currentBookMonth.year;
+  const targetMonth = options.month ?? currentBookMonth.monthIndex;
   const useWholeYear = targetMonth === null;
 
   const currentMonthTransactions = transactions.filter((item) => {
     if (!item.date) return false;
-    const date = dayjs(item.date);
-    if (useWholeYear) return date.year() === targetYear;
-    return date.year() === targetYear && date.month() === targetMonth;
+    if (useWholeYear) return isInBookYear(item.date, targetYear);
+    return isInBookMonth(item.date, targetYear, targetMonth);
   });
 
   const incomeTransactions = currentMonthTransactions.filter((item) => item.type === "income");
@@ -34,14 +40,14 @@ export function buildFinanceSummary(transactions, options = {}) {
 }
 
 export function buildMonthlyTrend(transactions, options = {}) {
-  const year = options.year ?? dayjs().year();
+  const currentBookMonth = getBookMonthFromDate();
+  const year = options.year ?? currentBookMonth.year;
   const months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 
   return months.map((month, monthIndex) => {
     const monthTransactions = transactions.filter((item) => {
       if (!item.date) return false;
-      const date = dayjs(item.date);
-      return date.year() === year && date.month() === monthIndex;
+      return isInBookMonth(item.date, year, monthIndex);
     });
 
     return {
@@ -53,21 +59,26 @@ export function buildMonthlyTrend(transactions, options = {}) {
 }
 
 export function buildCurrentMonthDailyTrend(transactions, options = {}) {
-  const now = dayjs();
-  const year = options.year ?? now.year();
-  const month = options.month ?? now.month();
-  const totalDays = dayjs(`${year}-${String(month + 1).padStart(2, "0")}-01`).daysInMonth();
+  const currentBookMonth = getBookMonthFromDate();
+  const range = options.startDate && options.endDate
+    ? { startDate: options.startDate, endDate: options.endDate }
+    : getBookMonthRange(
+        options.year ?? currentBookMonth.year,
+        options.month ?? currentBookMonth.monthIndex
+      );
+  const start = dayjs(range.startDate);
+  const end = dayjs(range.endDate);
+  const totalDays = end.diff(start, "day") + 1;
 
   return Array.from({ length: totalDays }, (_, index) => {
-    const dayNumber = index + 1;
+    const currentDate = start.add(index, "day");
     const dayTransactions = transactions.filter((item) => {
       if (!item.date) return false;
-      const date = dayjs(item.date);
-      return date.year() === year && date.month() === month && date.date() === dayNumber;
+      return inDateRange(item.date, currentDate.format("YYYY-MM-DD"), currentDate.format("YYYY-MM-DD"));
     });
 
     return {
-      day: String(dayNumber).padStart(2, "0"),
+      day: currentDate.format("DD MMM"),
       income: sumAmount(dayTransactions.filter((item) => item.type === "income")),
       expense: sumAmount(dayTransactions.filter((item) => item.type === "expense"))
     };
