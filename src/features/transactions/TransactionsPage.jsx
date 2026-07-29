@@ -1,363 +1,496 @@
+import { DeleteOutlined, EditOutlined, PlusOutlined } from "@ant-design/icons";
+import { Button, DatePicker, Input, Segmented, Typography } from "antd";
 import dayjs from "dayjs";
-import { ArrowDownOutlined, ArrowUpOutlined } from "@ant-design/icons";
-import { Card, DatePicker, Form, Select,Modal, Table, Typography } from "antd";
-import { useMemo, useState  } from "react";
+import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { useConfigSection, useFormatters } from "../../shared/config/useAppConfig";
+import { renderIcon } from "../../shared/config/iconRegistry";
+import { useCatalogue } from "../../shared/data/useCatalogue";
+import { useMutations } from "../../shared/data/useMutations";
+import { useDebounce } from "../../shared/hooks/useResponsive";
 import { useFinanceStore } from "../../shared/state/useFinanceStore";
-import { EmptyState } from "../../shared/components/EmptyState";
-import { SectionHeading } from "../../shared/components/SectionHeading";
-import { formatCurrency, formatDate } from "../../shared/utils/format";
-import { inDateRange } from "../../shared/utils/dateFilters";
-import { getKategoriByJenis, JENIS_ARUS_KAS, PILIHAN_JENIS_ARUS_KAS } from "../../shared/config/cashflow";
-import { themePalette } from "../../shared/config/themePalette";
+import {
+  Badge,
+  DataTable,
+  EmptyState,
+  Field,
+  FilterBar,
+  Money,
+  MoneyField,
+  MultiSelect,
+  PageHeader,
+  ResponsiveDialog,
+  SearchSelect,
+  StatCard,
+  useToast
+} from "../../shared/ui";
+import { buildRangePresets, getCurrentBookMonthRange } from "../../shared/utils/dateFilters";
+import { buildSummary, filterByRange, toDateString } from "../../shared/utils/finance";
 
+const { RangePicker } = DatePicker;
+
+/**
+ * Transaction ledger.
+ *
+ * Filtering happens in memory over the live snapshot — the dataset is a
+ * household's transactions, small enough that a round trip per filter change
+ * would cost more than it saves, and this way filters feel instant.
+ */
 export function TransactionsPage() {
+  const toast = useToast();
+  const mutations = useMutations();
+  const formatters = useFormatters();
+  const catalogue = useCatalogue();
+  const general = useConfigSection("general");
+
   const transactions = useFinanceStore((state) => state.transactions);
-  const members = useFinanceStore((state) => state.members);
-  const filters = useFinanceStore((state) => state.filters);
-  const setFilters = useFinanceStore((state) => state.setFilters);
+  const loading = useFinanceStore((state) => state.loading.transactions);
+  const removeLocal = useFinanceStore((state) => state.removeTransactionLocal);
+  const restore = useFinanceStore((state) => state.restoreTransactions);
 
-  const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const defaultRange = useMemo(() => {
+    const period = getCurrentBookMonthRange(general);
+    return [dayjs(period.startDate), dayjs(period.endDate)];
+  }, [general]);
 
-  const startDate = filters.startDate || "";
-  const endDate = filters.endDate || "";
+  const [range, setRange] = useState(defaultRange);
+  const [type, setType] = useState("all");
+  const [categoryIds, setCategoryIds] = useState([]);
+  const [memberIds, setMemberIds] = useState([]);
+  const [search, setSearch] = useState("");
+  const [selectedKeys, setSelectedKeys] = useState([]);
+  const [editing, setEditing] = useState(null);
+  const [editForm, setEditForm] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const categoryOptions = useMemo(() => {
-    if (filters.type === JENIS_ARUS_KAS.PEMASUKAN) return getKategoriByJenis(JENIS_ARUS_KAS.PEMASUKAN);
-    if (filters.type === JENIS_ARUS_KAS.PENGELUARAN) return getKategoriByJenis(JENIS_ARUS_KAS.PENGELUARAN);
-    return [...getKategoriByJenis(JENIS_ARUS_KAS.PENGELUARAN), ...getKategoriByJenis(JENIS_ARUS_KAS.PEMASUKAN)];
-  }, [filters.type]);
+  const debouncedSearch = useDebounce(search, 250);
 
-  const filteredTransactions = useMemo(
-    () =>
-      transactions.filter((item) => {
-        const matchDate = inDateRange(item.date, startDate, endDate);
-        const matchType = filters.type === "all" ? true : item.type === filters.type;
-        const matchCategory = filters.categoryId === "all" ? true : item.categoryId === filters.categoryId;
-        const matchMember = filters.activeMemberId === "all" ? true : item.userId === filters.activeMemberId;
-        return matchDate && matchType && matchCategory && matchMember;
-      }),
-    [endDate, filters.activeMemberId, filters.categoryId, filters.type, startDate, transactions],
-  );
-  const displayTransactions = [...filteredTransactions]
-    .sort((a, b) => dayjs(b.date).valueOf() - dayjs(a.date).valueOf());
+  const rows = useMemo(() => {
+    const keyword = debouncedSearch.trim().toLowerCase();
+    const [start, end] = range;
 
-  const totalPemasukan = filteredTransactions
-    .filter((item) => item.type === JENIS_ARUS_KAS.PEMASUKAN)
-    .reduce((total, item) => total + Number(item.amount || 0), 0);
-  const totalPengeluaran = filteredTransactions
-    .filter((item) => item.type === JENIS_ARUS_KAS.PENGELUARAN)
-    .reduce((total, item) => total + Number(item.amount || 0), 0);
+    return filterByRange(transactions, start?.format("YYYY-MM-DD"), end?.format("YYYY-MM-DD"))
+      .filter((item) => type === "all" || item.type === type)
+      .filter((item) => categoryIds.length === 0 || categoryIds.includes(item.categoryId))
+      .filter((item) => memberIds.length === 0 || memberIds.includes(item.userId))
+      .filter((item) => {
+        if (!keyword) return true;
+        const haystack = [
+          item.note,
+          item.title,
+          item.categoryName,
+          catalogue.getCategoryName(item.categoryId)
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(keyword);
+      })
+      .map((item) => ({ ...item, date: toDateString(item.date) }))
+      .sort((left, right) => right.date.localeCompare(left.date));
+  }, [transactions, range, type, categoryIds, memberIds, debouncedSearch, catalogue]);
 
-  if (!transactions.length) {
+  const summary = useMemo(() => buildSummary(rows), [rows]);
+
+  const activeFilterCount =
+    (type !== "all" ? 1 : 0) + categoryIds.length + memberIds.length + (search ? 1 : 0);
+
+  const resetFilters = () => {
+    setRange(defaultRange);
+    setType("all");
+    setCategoryIds([]);
+    setMemberIds([]);
+    setSearch("");
+  };
+
+  /** Optimistic delete with a window to undo, instead of a confirm dialog. */
+  const handleDelete = (record) => {
+    const snapshot = transactions;
+    removeLocal(record.id);
+
+    toast.undoable({
+      description: `Transaksi ${formatters.currency(record.amount)} dihapus.`,
+      rollback: () => restore(snapshot),
+      commit: () =>
+        mutations.remove("transactions", record.id, { context: "transaksi" }).then((outcome) => {
+          if (!outcome.ok) restore(snapshot);
+        })
+    });
+  };
+
+  const handleBulkDelete = () => {
+    const snapshot = transactions;
+    const ids = [...selectedKeys];
+    ids.forEach((id) => removeLocal(id));
+    setSelectedKeys([]);
+
+    toast.undoable({
+      description: `${ids.length} transaksi dihapus.`,
+      rollback: () => restore(snapshot),
+      commit: () =>
+        mutations.removeMany("transactions", ids, { context: "transaksi" }).then((outcome) => {
+          if (!outcome.ok) restore(snapshot);
+        })
+    });
+  };
+
+  const openEdit = (record) => {
+    setEditing(record);
+    setEditForm({
+      type: record.type,
+      amount: Number(record.amount) || null,
+      categoryId: record.categoryId || "",
+      note: record.note || "",
+      date: record.date
+    });
+  };
+
+  const handleUpdate = async () => {
+    if (!editForm.amount || Number(editForm.amount) <= 0) {
+      toast.warning("Nominal harus lebih dari 0.");
+      return;
+    }
+
+    const category = catalogue.getCategory(editForm.categoryId);
+    setSubmitting(true);
+    const outcome = await mutations.update(
+      "transactions",
+      editing.id,
+      {
+        type: editForm.type,
+        amount: Number(editForm.amount),
+        categoryId: editForm.categoryId || null,
+        categoryName: category?.name || null,
+        note: editForm.note.trim(),
+        title: editForm.note.trim() || category?.name || editForm.type,
+        date: editForm.date
+      },
+      { context: "transaksi", successMessage: "Transaksi diperbarui." },
+    );
+    setSubmitting(false);
+
+    if (outcome.ok) setEditing(null);
+  };
+
+  const columns = [
+    {
+      title: "Tanggal",
+      dataIndex: "date",
+      width: 120,
+      sorter: (left, right) => left.date.localeCompare(right.date),
+      render: (value) => (
+        <Typography.Text className="!whitespace-nowrap !text-muted">
+          {dayjs(value).format(general.dateFormat)}
+        </Typography.Text>
+      )
+    },
+    {
+      title: "Keterangan",
+      dataIndex: "note",
+      render: (value, record) => (
+        <div className="min-w-0">
+          <Typography.Text className="!block !truncate !font-medium !text-ink">
+            {value || catalogue.getCategoryName(record.categoryId)}
+          </Typography.Text>
+          <Typography.Text className="!block !truncate !text-caption !text-muted">
+            {catalogue.getMemberName(record.userId)}
+          </Typography.Text>
+        </div>
+      )
+    },
+    {
+      title: "Kategori",
+      dataIndex: "categoryId",
+      width: 170,
+      render: (value) => {
+        const category = catalogue.getCategory(value);
+        return category ? (
+          <Badge color={category.color}>{category.name}</Badge>
+        ) : (
+          <Typography.Text className="!text-subtle">Tanpa kategori</Typography.Text>
+        );
+      }
+    },
+    {
+      title: "Jenis",
+      dataIndex: "type",
+      width: 120,
+      render: (value) => (
+        <Badge tone={value === "income" ? "success" : "danger"}>
+          {catalogue.getTypeLabel(value)}
+        </Badge>
+      )
+    },
+    {
+      title: "Nominal",
+      dataIndex: "amount",
+      width: 160,
+      align: "right",
+      sorter: (left, right) => left.amount - right.amount,
+      render: (value, record) => <Money value={value} type={record.type} />
+    },
+    {
+      title: "",
+      key: "actions",
+      width: 88,
+      align: "right",
+      render: (_, record) => (
+        <div className="flex justify-end gap-1">
+          <Button
+            type="text"
+            size="small"
+            icon={<EditOutlined />}
+            onClick={(event) => {
+              event.stopPropagation();
+              openEdit(record);
+            }}
+            aria-label="Ubah transaksi"
+          />
+          <Button
+            type="text"
+            size="small"
+            danger
+            icon={<DeleteOutlined />}
+            onClick={(event) => {
+              event.stopPropagation();
+              handleDelete(record);
+            }}
+            aria-label="Hapus transaksi"
+          />
+        </div>
+      )
+    }
+  ];
+
+  const renderMobileCard = (record, { selected, toggleSelected }) => {
+    const category = catalogue.getCategory(record.categoryId);
+
     return (
-      <div className="space-y-4">
-        <SectionHeading eyebrow="Tabel Harian" title="Ringkasan transaksi" />
-        <EmptyState
-          title="Belum ada transaksi"
-          description="Setelah Anda mulai input pemasukan atau pengeluaran, tabel harian akan tampil di sini."
-        />
+      <div className="flex items-center gap-3 p-3.5">
+        <button
+          type="button"
+          onClick={toggleSelected}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-[16px]"
+          style={{
+            backgroundColor: selected
+              ? undefined
+              : category?.color
+                ? `${category.color}1F`
+                : undefined,
+            color: category?.color
+          }}
+          aria-label="Pilih transaksi"
+        >
+          {renderIcon(category?.icon || "tag")}
+        </button>
+
+        <div className="min-w-0 flex-1">
+          <Typography.Text className="!block !truncate !font-medium !text-ink">
+            {record.note || catalogue.getCategoryName(record.categoryId)}
+          </Typography.Text>
+          <Typography.Text className="!block !truncate !text-caption !text-muted">
+            {dayjs(record.date).format(general.dateFormat)} ·{" "}
+            {catalogue.getCategoryName(record.categoryId)}
+          </Typography.Text>
+        </div>
+
+        <Money value={record.amount} type={record.type} className="shrink-0" />
       </div>
     );
-  }
+  };
 
   return (
-    <div className="space-y-2.5">
-      <SectionHeading eyebrow="Tabel Harian" title="Ringkasan transaksi" />
+    <div className="animate-fade-in">
+      <PageHeader
+        eyebrow="Catatan"
+        title="Transaksi"
+        description={`${rows.length} transaksi pada rentang terpilih`}
+        actions={
+          <Link to="/dashboard/add">
+            <Button type="primary" icon={<PlusOutlined />}>
+              Catat transaksi
+            </Button>
+          </Link>
+        }
+      />
 
-      <Card className="finance-card finance-soft-card">
-        <Form layout="vertical" component={false}>
-          <Field label="Rentang tanggal">
-            <div className="grid grid-cols-2 gap-2">
-              <DatePicker
-                className="!w-full"
-                size="large"
-                format="DD MMM YYYY"
-                placeholder="Tanggal mulai"
-                value={startDate ? dayjs(startDate) : null}
-                onChange={(value) =>
-                  setFilters({
-                    startDate: value ? value.format("YYYY-MM-DD") : "",
-                    endDate
-                  })
-                }
-              />
-              <DatePicker
-                className="!w-full"
-                size="large"
-                format="DD MMM YYYY"
-                placeholder="Tanggal akhir"
-                value={endDate ? dayjs(endDate) : null}
-                onChange={(value) =>
-                  setFilters({
-                    startDate,
-                    endDate: value ? value.format("YYYY-MM-DD") : ""
-                  })
-                }
-              />
-            </div>
-          </Field>
+      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard label="Jumlah transaksi" value={rows.length} loading={loading} />
+        <StatCard
+          label="Pemasukan"
+          value={formatters.compact(summary.income)}
+          tone="success"
+          loading={loading}
+        />
+        <StatCard
+          label="Pengeluaran"
+          value={formatters.compact(summary.expense)}
+          tone="danger"
+          loading={loading}
+        />
+        <StatCard
+          label="Arus kas bersih"
+          value={formatters.compact(summary.net)}
+          tone={summary.net >= 0 ? "success" : "danger"}
+          loading={loading}
+        />
+      </div>
 
-          <div className="mt-2 grid grid-cols-3 gap-2">
-            <Field label="Jenis">
-              <Select
-                value={filters.type}
-                onChange={(value) =>
-                  setFilters({
-                    type: value,
-                    categoryId: "all"
-                  })
-                }
-                size="large"
-                options={[
-                  { value: "all", label: "Semua" },
-                  ...PILIHAN_JENIS_ARUS_KAS.map((item) => ({ value: item.value, label: item.label }))
-                ]}
+      <FilterBar
+        className="mb-4"
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Cari keterangan atau kategori…"
+        activeCount={activeFilterCount}
+        onReset={resetFilters}
+      >
+        <Field label="Rentang tanggal">
+          <RangePicker
+            value={range}
+            onChange={(value) => value && setRange(value)}
+            format={general.dateFormat}
+            presets={buildRangePresets(general)}
+            allowClear={false}
+            className="!w-full md:!w-[260px]"
+          />
+        </Field>
+
+        <Field label="Jenis">
+          <Segmented
+            value={type}
+            onChange={setType}
+            options={[
+              { label: "Semua", value: "all" },
+              ...catalogue.transactionTypes.map((item) => ({
+                label: item.label,
+                value: item.id
+              }))
+            ]}
+          />
+        </Field>
+
+        <Field label="Kategori">
+          <MultiSelect
+            size="middle"
+            value={categoryIds}
+            onChange={setCategoryIds}
+            options={catalogue.categoryOptions()}
+            className="md:!w-[200px]"
+          />
+        </Field>
+
+        <Field label="Anggota">
+          <MultiSelect
+            size="middle"
+            value={memberIds}
+            onChange={setMemberIds}
+            options={catalogue.memberOptions}
+            className="md:!w-[180px]"
+          />
+        </Field>
+      </FilterBar>
+
+      <DataTable
+        dataSource={rows}
+        columns={columns}
+        renderMobileCard={renderMobileCard}
+        loading={loading}
+        scrollX={940}
+        onRowClick={openEdit}
+        selection={{
+          selectedKeys,
+          onChange: setSelectedKeys,
+          actions: (
+            <Button size="small" danger icon={<DeleteOutlined />} onClick={handleBulkDelete}>
+              Hapus terpilih
+            </Button>
+          )
+        }}
+        emptyState={
+          <EmptyState
+            title={activeFilterCount > 0 ? "Tidak ada yang cocok" : "Belum ada transaksi"}
+            description={
+              activeFilterCount > 0
+                ? "Longgarkan filter atau perlebar rentang tanggalnya."
+                : "Mulai catat pemasukan dan pengeluaran untuk melihat riwayatnya di sini."
+            }
+            action={
+              activeFilterCount > 0 ? (
+                <Button onClick={resetFilters}>Reset filter</Button>
+              ) : (
+                <Link to="/dashboard/add">
+                  <Button type="primary" icon={<PlusOutlined />}>
+                    Catat transaksi
+                  </Button>
+                </Link>
+              )
+            }
+          />
+        }
+      />
+
+      <ResponsiveDialog
+        open={Boolean(editing)}
+        onClose={() => setEditing(null)}
+        onSubmit={handleUpdate}
+        submitting={submitting}
+        title="Ubah transaksi"
+      >
+        {editForm ? (
+          <>
+            <Segmented
+              block
+              className="ds-segmented-lg"
+              value={editForm.type}
+              onChange={(value) => setEditForm({ ...editForm, type: value, categoryId: "" })}
+              options={catalogue.transactionTypes.map((item) => ({
+                label: item.label,
+                value: item.id
+              }))}
+            />
+
+            <Field label="Nominal" required>
+              <MoneyField
+                value={editForm.amount}
+                onChange={(value) => setEditForm({ ...editForm, amount: value })}
+                currencySymbol={general.currencySymbol}
+                locale={general.locale}
               />
             </Field>
 
             <Field label="Kategori">
-              <Select
-                value={filters.categoryId}
-                onChange={(value) => setFilters({ categoryId: value })}
-                size="large"
-                options={[
-                  { value: "all", label: "Semua" },
-                  ...categoryOptions.map((item) => ({ value: item.id, label: item.name }))
-                ]}
+              <SearchSelect
+                options={catalogue.categoryOptions(editForm.type)}
+                value={editForm.categoryId}
+                onChange={(value) => setEditForm({ ...editForm, categoryId: value })}
+                allowClear
               />
             </Field>
 
-            <Field label="User">
-              <Select
-                value={filters.activeMemberId}
-                onChange={(value) => setFilters({ activeMemberId: value })}
+            <Field label="Keterangan" optional>
+              <Input
                 size="large"
-                options={[
-                  { value: "all", label: "Semua" },
-                  ...members.map((member) => ({
-                    value: member.id,
-                    label: member.fullName || member.name
-                  }))
-                ]}
+                value={editForm.note}
+                onChange={(event) => setEditForm({ ...editForm, note: event.target.value })}
+                maxLength={120}
               />
             </Field>
-          </div>
-        </Form>
-      </Card>
 
-      <div className="grid grid-cols-2 gap-2">
-        <SummaryCard label="Total pemasukan" value={formatCurrency(totalPemasukan)} tone="income" />
-        <SummaryCard label="Total pengeluaran" value={formatCurrency(totalPengeluaran)} tone="expense" />
-      </div>
-
-      <Card className="finance-card" styles={{ body: { padding: 0, overflow: "hidden" } }}>
-        <Table
-          size="small"
-          tableLayout="fixed"
-          rowKey="id"
-          pagination={{
-            pageSize: 15,
-            size: "small",
-            showSizeChanger: false
-          }}
-          dataSource={displayTransactions}
-          locale={{ emptyText: "Tidak ada data pada filter yang dipilih." }}
-          onRow={(record) => ({
-            onClick: () => setSelectedTransaction(record),
-            className: "cursor-pointer",
-          })}
-          columns={[
-            {
-              title: "Tanggal",
-              dataIndex: "date",
-              width: 76,
-              render: (value) => (
-                <Typography.Text className="!text-[11px] !text-muted">
-                  {formatDate(value, "DD/MM/YY")}
-                </Typography.Text>
-              )
-            },
-            {
-              title: "User",
-              dataIndex: "memberName",
-              width: 84,
-              render: (value) => (
-                <Typography.Text className="!text-[11px] !text-ink">
-                  {truncateText(value, 10)}
-                </Typography.Text>
-              )
-            },
-            {
-              title: "Kategori",
-              dataIndex: "categoryName",
-              width: 92,
-              render: (value) => (
-                <Typography.Text className="!text-[11px] !text-ink">
-                  {truncateText(value, 11)}
-                </Typography.Text>
-              )
-            },
-            {
-                title: "Nominal",
-                dataIndex: "amount",
-                width: 112,
-                align: "right",
-                render: (value, item) => (
-                  <div className="flex items-center justify-end gap-1.5">
-                    <span
-                      className="flex items-center justify-center"
-                      style={{
-                        color:
-                          item.type === JENIS_ARUS_KAS.PEMASUKAN
-                            ? themePalette.colors.success
-                            : themePalette.colors.expense
-                      }}
-                    >
-                      {item.type === JENIS_ARUS_KAS.PEMASUKAN ? (
-                        <ArrowDownOutlined className="text-[10px]" />
-                      ) : (
-                        <ArrowUpOutlined className="text-[10px]" />
-                      )}
-                    </span>
-                    <Typography.Text className="!text-[11px] !font-medium !text-ink">
-                      {formatCurrency(value)}
-                    </Typography.Text>
-                  </div>
-                )
-              },
-            
-          ]}
-        />
-      </Card>
-
-      <TransactionDetailModal
-        transaction={selectedTransaction}
-        onClose={() => setSelectedTransaction(null)}
-      />
-          </div>
-  );
-}
-function TransactionDetailModal({ transaction, onClose }) {
-  const open = Boolean(transaction);
-
-  if (!transaction) return null;
-
-  const isIncome = transaction.type === JENIS_ARUS_KAS.PEMASUKAN;
-  const toneColor = isIncome ? themePalette.colors.success : themePalette.colors.expense;
-
-  return (
-    <Modal
-      open={open}
-      onCancel={onClose}
-      footer={null}
-      title={null}
-      centered
-      width={360}
-      styles={{
-        content: {
-          background: themePalette.colors.panel,
-          padding: 14,
-          borderRadius: 18,
-        },
-        body: { padding: 0 },
-      }}
-    >
-      <div className="space-y-3">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <Typography.Text className="block !text-[11px] uppercase tracking-[0.12em] !text-muted">
-              Detail transaksi
-            </Typography.Text>
-
-            <Typography.Title level={4} className="!mb-0 !mt-1 !text-[18px] !font-bold">
-              {formatCurrency(transaction.amount)}
-            </Typography.Title>
-          </div>
-
-          <span
-            className="rounded-full px-2.5 py-1 text-[11px] font-semibold"
-            style={{
-              background: `${toneColor}1f`,
-              color: toneColor,
-            }}
-          >
-            {isIncome ? "Pemasukan" : "Pengeluaran"}
-          </span>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2 rounded-2xl border border-line bg-panel/60 p-3">
-          <DetailItem label="Tanggal" value={formatDate(transaction.date)} />
-          <DetailItem label="User" value={transaction.memberName || "-"} />
-          <DetailItem label="Kategori" value={transaction.categoryName || "-"} />
-          <DetailItem label="Nominal" value={formatCurrency(transaction.amount)} />
-        </div>
-
-        <div className="rounded-2xl border border-line bg-panel/60 p-3">
-          <Typography.Text className="block !text-[10px] uppercase tracking-[0.12em] !text-muted">
-            Keterangan
-          </Typography.Text>
-
-          <Typography.Text className="mt-1 block whitespace-pre-line !text-[13px] !text-ink">
-            {transaction.note || "Tidak ada keterangan."}
-          </Typography.Text>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
-function DetailItem({ label, value }) {
-  return (
-    <div className="min-w-0">
-      <Typography.Text className="block !text-[10px] uppercase tracking-[0.08em] !text-muted">
-        {label}
-      </Typography.Text>
-      <Typography.Text className="block truncate !text-[12px] !font-medium !text-ink">
-        {value}
-      </Typography.Text>
+            <Field label="Tanggal" required>
+              <DatePicker
+                size="large"
+                className="!w-full"
+                format={general.dateFormat}
+                allowClear={false}
+                value={editForm.date ? dayjs(editForm.date) : null}
+                onChange={(value) =>
+                  setEditForm({ ...editForm, date: value ? value.format("YYYY-MM-DD") : "" })
+                }
+              />
+            </Field>
+          </>
+        ) : null}
+      </ResponsiveDialog>
     </div>
-  );
-}
-
-function truncateText(value, maxLength) {
-  if (!value) return "-";
-  return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
-}
-
-function Field({ label, children }) {
-  return (
-    <Form.Item
-      label={<span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">{label}</span>}
-      className="!mb-0"
-    >
-      {children}
-    </Form.Item>
-  );
-}
-
-function SummaryCard({ label, value, tone }) {
-  const isIncome = tone === "income";
-  const toneColor = isIncome ? themePalette.colors.success : themePalette.colors.expense;
-
-  return (
-    <Card className="finance-card finance-soft-card">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <Typography.Text className="metric-label text-[10px]">{label}</Typography.Text>
-          <Typography.Title level={4} className="!mb-0 !mt-2 !text-[14px] !font-bold !text-ink">
-            {value}
-          </Typography.Title>
-        </div>
-        <span
-          className="flex h-8 w-8 items-center justify-center rounded-full"
-          style={{
-            background: `${toneColor}1f`,
-            color: toneColor
-          }}
-        >
-          {isIncome ? <ArrowDownOutlined /> : <ArrowUpOutlined />}
-        </span>
-      </div>
-    </Card>
   );
 }

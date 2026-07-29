@@ -11,6 +11,10 @@ export function formatCurrency(value) {
   }).format(value || 0);
 }
 
+export function formatPercent(value) {
+  return `${Number(value || 0).toFixed(1)}%`;
+}
+
 export function formatCompactCurrency(value) {
   return new Intl.NumberFormat("id-ID", {
     notation: "compact",

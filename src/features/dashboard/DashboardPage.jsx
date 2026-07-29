@@ -1,249 +1,268 @@
+import { PlusOutlined, SettingOutlined } from "@ant-design/icons";
+import { Button, Tooltip, Typography } from "antd";
 import dayjs from "dayjs";
-import {
-  ArrowUpOutlined,
-  BarChartOutlined,
-  WalletOutlined
-} from "@ant-design/icons";
-import { Card, Typography } from "antd";
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import {
-  CartesianGrid,
-  Legend,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-  Line,
-  LineChart,
-  BarChart,
-  Bar
-} from "recharts";
+import { useConfigSection, useFormatters } from "../../shared/config/useAppConfig";
+import { useCatalogue } from "../../shared/data/useCatalogue";
+import { useTheme } from "../../shared/design/ThemeProvider";
+import { useLocalStorage } from "../../shared/hooks/useResponsive";
 import { useFinanceStore } from "../../shared/state/useFinanceStore";
-import { SectionHeading } from "../../shared/components/SectionHeading";
-import { MetricCard } from "../../shared/components/MetricCard";
-import { TransactionList } from "../../shared/components/TransactionList";
-import { EmptyState } from "../../shared/components/EmptyState";
-import { formatAxisCurrency, formatCurrency, formatDate } from "../../shared/utils/format";
-import { themePalette } from "../../shared/config/themePalette";
-import { getCurrentBookMonthRange, inDateRange } from "../../shared/utils/dateFilters";
+import { EmptyState, PageHeader, SkeletonStatRow, SortableList, Card } from "../../shared/ui";
 import {
+  getCurrentBookMonthRange,
+  getPreviousBookMonthRange
+} from "../../shared/utils/dateFilters";
+import {
+  buildBudgetUsage,
   buildCategoryBreakdown,
-  buildCurrentMonthDailyTrend,
-  buildFinanceSummary,
-  buildUserInputSummary,
-  getFinanceTotals,
-  getSavingsTotal
+  buildDailySeries,
+  buildFinanceRecords,
+  buildGoalProgress,
+  buildMonthlySeries,
+  buildRunningBalance,
+  buildSummary,
+  filterByRange,
+  percentChange,
+  toDateString
 } from "../../shared/utils/finance";
+import {
+  BalanceWidget,
+  BillsWidget,
+  BudgetWidget,
+  CashflowWidget,
+  CategoriesWidget,
+  GoalsWidget,
+  IncomeExpenseWidget,
+  QuickActionsWidget,
+  RecentWidget
+} from "./widgets";
 
+/**
+ * Dashboard.
+ *
+ * Layout comes from the CMS `dashboard.widgets` list; each user may then
+ * reorder their own copy, stored locally. All figures are derived once here and
+ * handed to the widgets, so the page does a single pass over the transactions
+ * no matter how many widgets are switched on.
+ */
 export function DashboardPage() {
-  const family = useFinanceStore((state) => state.family);
+  const formatters = useFormatters();
+  const catalogue = useCatalogue();
+  const { colors } = useTheme();
+
+  const general = useConfigSection("general");
+  const dashboardConfig = useConfigSection("dashboard");
+  const taxonomy = useConfigSection("taxonomy");
+  const notifications = useConfigSection("notifications");
+
   const transactions = useFinanceStore((state) => state.transactions);
+  const budgets = useFinanceStore((state) => state.budgets);
   const savingsGoals = useFinanceStore((state) => state.savingsGoals);
+  const savingContributions = useFinanceStore((state) => state.savingContributions);
   const financeRecords = useFinanceStore((state) => state.financeRecords);
-  const now = dayjs();
-  const currentBookRange = getCurrentBookMonthRange(now);
-  const currentBookPeriodLabel = `${formatDate(currentBookRange.startDate)} - ${formatDate(currentBookRange.endDate)}`;
-  const currentMonthTransactions = transactions.filter((item) => {
-    return inDateRange(item.date, currentBookRange.startDate, currentBookRange.endDate);
-  });
-  const recentWeeklyTransactions = currentMonthTransactions
-    .filter((item) => item.date && dayjs(item.date).isAfter(now.subtract(7, "day").startOf("day")))
-    .sort((a, b) => dayjs(b.date).valueOf() - dayjs(a.date).valueOf());
+  const financePayments = useFinanceStore((state) => state.financePayments);
+  const loading = useFinanceStore((state) => state.loading.transactions);
 
-  const dashboardSummary = {
-    ...buildFinanceSummary(transactions),
-    ...getFinanceTotals(financeRecords),
-    totalSavings: getSavingsTotal(savingsGoals)
-  };
-  const monthlyTrend = buildCurrentMonthDailyTrend(currentMonthTransactions);
-  const categoryBreakdown = buildCategoryBreakdown(currentMonthTransactions);
-  const userSummary = buildUserInputSummary(currentMonthTransactions);
+  const [customOrder, setCustomOrder] = useLocalStorage("fm:dashboard-order", null);
 
-  if (!transactions.length && !savingsGoals.length && !financeRecords.length) {
+  const data = useMemo(() => {
+    const period = getCurrentBookMonthRange(general);
+    const previousPeriod = getPreviousBookMonthRange(general);
+
+    const periodTransactions = filterByRange(transactions, period.startDate, period.endDate);
+    const previousTransactions = filterByRange(
+      transactions,
+      previousPeriod.startDate,
+      previousPeriod.endDate,
+    );
+
+    const summary = buildSummary(periodTransactions);
+    const previousSummary = buildSummary(previousTransactions);
+
+    const records = buildFinanceRecords(financeRecords, financePayments);
+
+    return {
+      period,
+      year: dayjs().year(),
+      colors,
+      summary,
+      balance: buildRunningBalance(transactions),
+      deltas: {
+        income: percentChange(summary.income, previousSummary.income),
+        expense: percentChange(summary.expense, previousSummary.expense)
+      },
+      dailySeries: buildDailySeries(periodTransactions, period.startDate, period.endDate),
+      monthlySeries: buildMonthlySeries(transactions, dayjs().year(), general),
+      categoryBreakdown: buildCategoryBreakdown(periodTransactions, catalogue.categories, "expense"),
+      budgetUsage: buildBudgetUsage(
+        budgets,
+        periodTransactions,
+        catalogue.categories,
+        notifications.budgetAlertThreshold,
+      ),
+      goals: buildGoalProgress(savingsGoals, savingContributions).filter((goal) => !goal.isReached),
+      upcomingBills: records
+        .filter((record) => record.recordType === "debt" && !record.isSettled && record.dueDate)
+        .sort((left, right) => String(left.dueDate).localeCompare(String(right.dueDate))),
+      recent: [...periodTransactions]
+        .sort((left, right) => toDateString(right.date).localeCompare(toDateString(left.date)))
+        .slice(0, 6)
+        .map((item) => ({ ...item, date: toDateString(item.date) }))
+    };
+  }, [
+    transactions,
+    budgets,
+    savingsGoals,
+    savingContributions,
+    financeRecords,
+    financePayments,
+    catalogue.categories,
+    general,
+    notifications.budgetAlertThreshold,
+    colors
+  ]);
+
+  /** CMS order, then the user's personal arrangement layered on top. */
+  const widgets = useMemo(() => {
+    const enabled = dashboardConfig.widgets.filter((widget) => widget.enabled !== false);
+    if (!customOrder) return enabled;
+
+    const byId = new Map(enabled.map((widget) => [widget.id, widget]));
+    const ordered = customOrder.map((id) => byId.get(id)).filter(Boolean);
+    const added = enabled.filter((widget) => !customOrder.includes(widget.id));
+
+    return [...ordered, ...added];
+  }, [dashboardConfig.widgets, customOrder]);
+
+  const quickActions = dashboardConfig.quickActions.filter((item) => item.enabled !== false);
+  const hasNoData = !loading && transactions.length === 0 && budgets.length === 0;
+
+  if (loading && transactions.length === 0) {
     return (
-      <div className="space-y-4">
-        <SectionHeading eyebrow="Beranda" title="Ringkasan keuangan keluarga" />
-        <EmptyState
-          title="Belum ada data"
-          description="Mulai dari input harian, lalu catat hutang, piutang, atau target tabungan agar dashboard langsung terisi."
-        />
+      <div className="animate-fade-in">
+        <PageHeader eyebrow="Ringkasan" title="Dashboard" />
+        <SkeletonStatRow />
       </div>
     );
   }
 
-  return (
-    <div className="space-y-4">
-      <div>
-        <SectionHeading title="Ringkasan Bulan Ini" />
-        <Typography.Text className="mt-1 block !text-[11px] !text-muted">
-          Periode tutup buku: {currentBookPeriodLabel}
-        </Typography.Text>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <MetricCard label="Pemasukan" value={dashboardSummary.incomeMonth} tone="income" />
-        <MetricCard label="Pengeluaran" value={dashboardSummary.expenseMonth} tone="expense" />
-        <MetricCard label="Arus kas bersih" value={dashboardSummary.netCashflow} tone="margin" />
-        <MetricCard label="Total tabungan" value={dashboardSummary.totalSavings} tone="savings" />
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <MetricCard label="Sisa hutang" value={dashboardSummary.totalDebt} tone="warning" />
-        <MetricCard label="Sisa piutang" value={dashboardSummary.totalReceivable} tone="default" />
-      </div>
-
-      <div className="grid grid-cols-4 gap-2">
-        <ShortcutCard title="Input" icon={<ArrowUpOutlined />} to="/dashboard/add" />
-        <ShortcutCard title="Tabung" icon={<WalletOutlined />} to="/dashboard/savings" />
-        <ShortcutCard title="Hutang" icon={<WalletOutlined />} to="/dashboard/debts" />
-        <ShortcutCard title="Lapor" icon={<BarChartOutlined />} to="/dashboard/reports" />
-      </div>
-
-       {/* Recent Transactions */}
-      <section className="space-y-3">
-        <SectionHeading eyebrow="Terbaru" title="Transaksi terakhir" />
-        <Typography.Text className="block !text-[11px] !text-muted">
-          Menampilkan transaksi 7 hari terakhir pada periode berjalan.
-        </Typography.Text>
-        <TransactionList items={recentWeeklyTransactions} pageSize={8} minHeight={420} />
-      </section>
-
-      {/* Monthly Trend */}
-      <Card className="finance-card finance-section">
-        <SectionHeading eyebrow="Tren" title="Pergerakan bulan ini" />
-        <div className="mt-4 h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={monthlyTrend} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
-              <CartesianGrid vertical={false} stroke={themePalette.colors.lineSoft} strokeDasharray="3 3" />
-              <XAxis
-                dataKey="day"
-                tickLine={false}
-                axisLine={false}
-                tick={{ fill: themePalette.colors.muted, fontSize: 11 }}
-              />
-              <YAxis
-                width={44}
-                tickLine={false}
-                axisLine={false}
-                tick={{ fill: themePalette.colors.muted, fontSize: 11 }}
-                tickFormatter={formatAxisCurrency}
-              />
-              <Tooltip formatter={(value) => formatCurrency(value)} />
-              <Legend
-                verticalAlign="top"
-                height={24}
-                formatter={(value) => (
-                  <span style={{ color: themePalette.colors.inkMuted, fontSize: 11, fontWeight: 600 }}>
-                    {value === "income" ? "Pemasukan" : "Pengeluaran"}
-                  </span>
-                )}
-              />
-              <Line
-                type="monotone"
-                dataKey="income"
-                stroke={themePalette.colors.success}
-                strokeWidth={2.5}
-                dot={{ r: 2.5, strokeWidth: 0, fill: themePalette.colors.success }}
-                activeDot={{ r: 4 }}
-                name="income"
-              />
-              <Line
-                type="monotone"
-                dataKey="expense"
-                stroke={themePalette.colors.expense}
-                strokeWidth={2.5}
-                dot={{ r: 2.5, strokeWidth: 0, fill: themePalette.colors.expense }}
-                activeDot={{ r: 4 }}
-                name="expense"
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </Card>
-
-        {/* Category Breakdown */}
-      <section className="space-y-3">
-        <SectionHeading eyebrow="Kategori" title="Pengeluaran terbesar" />
-        {categoryBreakdown.length ? (
-          <Card className="finance-card">
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={categoryBreakdown} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
-                  <CartesianGrid vertical={false} stroke={themePalette.colors.lineSoft} strokeDasharray="3 3" />
-                  <XAxis
-                    dataKey="name"
-                    tickLine={false}
-                    axisLine={false}
-                    tick={{ fill: themePalette.colors.muted, fontSize: 11 }}
-                  />
-                  <YAxis
-                    width={48}
-                    tickLine={false}
-                    axisLine={false}
-                    tick={{ fill: themePalette.colors.muted, fontSize: 11 }}
-                    tickFormatter={formatAxisCurrency}
-                  />
-                  <Tooltip formatter={(value) => formatCurrency(value)} />
-                  <Bar dataKey="value" name="Pengeluaran" fill={themePalette.colors.expense} radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </Card>
-        ) : (
+  if (hasNoData) {
+    return (
+      <div className="animate-fade-in">
+        <PageHeader eyebrow="Ringkasan" title="Dashboard" />
+        <Card padding="none">
           <EmptyState
-            title="Belum ada pengeluaran"
-            description="Daftar kategori pengeluaran akan muncul setelah input harian mulai berjalan."
+            title="Mulai dari transaksi pertama"
+            description={
+              catalogue.isEmpty
+                ? "Buat beberapa kategori dulu, lalu catat transaksi pertama. Setelah itu dashboard akan terisi otomatis."
+                : "Catat pemasukan atau pengeluaran pertama Anda. Ringkasan, grafik, dan anggaran akan langsung tampil di sini."
+            }
+            action={
+              <Link to={catalogue.isEmpty ? "/dashboard/categories" : "/dashboard/add"}>
+                <Button type="primary" icon={<PlusOutlined />}>
+                  {catalogue.isEmpty ? "Buat kategori" : "Catat transaksi"}
+                </Button>
+              </Link>
+            }
+            secondaryAction={
+              <Link to="/dashboard/configuration">
+                <Button icon={<SettingOutlined />}>Buka konfigurasi</Button>
+              </Link>
+            }
           />
-        )}
-      </section>
+        </Card>
+      </div>
+    );
+  }
 
-        {/* User Comparison */}
-      <section className="space-y-3">
-        <SectionHeading eyebrow="User" title="Perbandingan berdasarkan penginput" />
-        {userSummary.length ? (
-          <div className="space-y-2">
-            {userSummary.map((item) => (
-              <Card key={item.name} className="finance-card finance-soft-card">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <Typography.Text className="!block !text-[12px] !font-semibold !text-ink">
-                      {item.name}
-                    </Typography.Text>
-                    <Typography.Text className="!text-[11px] !text-muted">
-                      {item.count} transaksi periode ini
-                    </Typography.Text>
-                  </div>
-                  <Typography.Text className="!text-[12px] !font-semibold !text-primary">
-                    {formatCurrency(item.expense)}
-                  </Typography.Text>
-                </div>
-              </Card>
-            ))}
+  const renderWidget = (widget) => {
+    const shared = { widget, data, formatters, catalogue };
+
+    switch (widget.type) {
+      case "stat-balance":
+        return (
+          <BalanceWidget
+            data={data}
+            formatters={formatters}
+            labels={taxonomy.labels}
+            loading={loading}
+          />
+        );
+      case "chart-cashflow":
+        return <CashflowWidget {...shared} />;
+      case "chart-income-expense":
+        return <IncomeExpenseWidget {...shared} />;
+      case "chart-categories":
+        return <CategoriesWidget {...shared} />;
+      case "list-budget":
+        return <BudgetWidget {...shared} alertThreshold={notifications.budgetAlertThreshold} />;
+      case "list-bills":
+        return <BillsWidget {...shared} />;
+      case "list-goals":
+        return <GoalsWidget {...shared} />;
+      case "list-recent":
+        return <RecentWidget {...shared} />;
+      case "quick-actions":
+        return <QuickActionsWidget widget={widget} actions={quickActions} />;
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="animate-fade-in">
+      <PageHeader
+        eyebrow="Ringkasan"
+        title="Dashboard"
+        description={`Periode ${data.period.label}`}
+        actions={
+          <>
+            <Tooltip title="Susun ulang widget">
+              <Button
+                icon={<SettingOutlined />}
+                onClick={() => setCustomOrder(customOrder ? null : widgets.map((item) => item.id))}
+              >
+                {customOrder ? "Selesai menyusun" : "Susun widget"}
+              </Button>
+            </Tooltip>
+            <Link to="/dashboard/add">
+              <Button type="primary" icon={<PlusOutlined />}>
+                Catat transaksi
+              </Button>
+            </Link>
+          </>
+        }
+      />
+
+      {customOrder ? (
+        <Card className="mb-4 p-4">
+          <Typography.Text className="!mb-3 !block !text-small !text-muted">
+            Seret untuk mengubah urutan widget. Susunan ini hanya berlaku untuk Anda — susunan
+            default keluarga diatur di halaman konfigurasi.
+          </Typography.Text>
+          <SortableList
+            items={widgets}
+            getKey={(item) => item.id}
+            onReorder={(items) => setCustomOrder(items.map((item) => item.id))}
+            renderItem={(item) => (
+              <Typography.Text className="!text-body !text-ink">{item.title}</Typography.Text>
+            )}
+          />
+        </Card>
+      ) : null}
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        {widgets.map((widget) => (
+          <div
+            key={widget.id}
+            className={widget.size === "full" ? "xl:col-span-2" : "xl:col-span-1"}
+          >
+            {renderWidget(widget)}
           </div>
-        ) : (
-          <EmptyState
-            title="Belum ada perbandingan user"
-            description="Perbandingan user akan tampil otomatis setelah ada data transaksi."
-          />
-        )}
-      </section>
-
-       
+        ))}
+      </div>
     </div>
-  );
-}
-
-function ShortcutCard({ title, icon, to }) {
-  return (
-    <Link to={to} className="block !no-underline">
-      <Card className="!h-full !border-line !text-center" styles={{ body: { padding: 6 } }}>
-        <div className="flex min-h-[60px] flex-col items-center justify-center text-center">
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-base font-extrabold ">
-            {icon}
-          </span>
-          <Typography.Text className="mt-2 !text-[11px] !font-semibold !text-ink">{title}</Typography.Text>
-        </div>
-      </Card>
-    </Link>
   );
 }

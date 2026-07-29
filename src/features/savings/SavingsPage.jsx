@@ -1,433 +1,520 @@
+import { DeleteOutlined, EditOutlined, PlusOutlined, RiseOutlined } from "@ant-design/icons";
+import { Button, DatePicker, Input, Typography } from "antd";
 import dayjs from "dayjs";
-import { useEffect, useMemo, useState } from "react";
-import { Alert, Button, Card, DatePicker, Input, InputNumber, Modal, Progress, Select, Space, Table, Tag, Typography } from "antd";
-import { EmptyState } from "../../shared/components/EmptyState";
-import { SectionHeading } from "../../shared/components/SectionHeading";
-import { formatCurrency, formatDate } from "../../shared/utils/format";
-import {
-  createSavingContribution,
-  createSavingGoal,
-  updateSavingGoal
-} from "../../shared/firebase/firestoreHousehold.js";
-import { useAuth } from "../auth/AuthProvider";
+import { useMemo, useState } from "react";
+import { useConfigSection, useFormatters } from "../../shared/config/useAppConfig";
+import { useMutations } from "../../shared/data/useMutations";
 import { useFinanceStore } from "../../shared/state/useFinanceStore";
-import { createTransaction } from "../../shared/firebase/firestoreTransactions";
-import { themePalette } from "../../shared/config/themePalette";
+import {
+  Badge,
+  Card,
+  DataTable,
+  EmptyState,
+  Field,
+  Money,
+  MoneyField,
+  PageHeader,
+  ProgressMeter,
+  ResponsiveDialog,
+  StatCard,
+  useToast
+} from "../../shared/ui";
+import { buildGoalProgress, toDateString } from "../../shared/utils/finance";
 
+const EMPTY_GOAL = { name: "", targetAmount: null, targetDate: "", description: "" };
+const EMPTY_CONTRIBUTION = { amount: null, date: dayjs().format("YYYY-MM-DD"), note: "" };
+
+/**
+ * Savings goals and their contribution history.
+ *
+ * Progress is recomputed from the contribution log rather than a stored total,
+ * so deleting a contribution always corrects the goal automatically.
+ */
 export function SavingsPage() {
-  const family = useFinanceStore((state) => state.family);
+  const toast = useToast();
+  const mutations = useMutations();
+  const formatters = useFormatters();
+  const general = useConfigSection("general");
+  const workflow = useConfigSection("workflow");
+
   const savingsGoals = useFinanceStore((state) => state.savingsGoals);
-  const savingContributions = useFinanceStore((state) => state.savingContributions);
-  const members = useFinanceStore((state) => state.members);
-  const { user } = useAuth();
-  const [name, setName] = useState("");
-  const [targetAmount, setTargetAmount] = useState("");
-  const [targetDate, setTargetDate] = useState("");
-  const [activeGoalId, setActiveGoalId] = useState("");
-  const [contributionAmount, setContributionAmount] = useState("");
-  const [contributionDate, setContributionDate] = useState(new Date().toISOString().slice(0, 10));
-  const [contributionNote, setContributionNote] = useState("");
-  const [goalAlert, setGoalAlert] = useState(null);
-  const [contributionAlert, setContributionAlert] = useState(null);
-  const [selectedGoal, setSelectedGoal] = useState(null);
+  const contributions = useFinanceStore((state) => state.savingContributions);
+  const loading = useFinanceStore((state) => state.loading.savings);
 
-  useEffect(() => {
-    if (!goalAlert) return undefined;
-    const timeoutId = window.setTimeout(() => setGoalAlert(null), 2000);
-    return () => window.clearTimeout(timeoutId);
-  }, [goalAlert]);
+  const [goalDialog, setGoalDialog] = useState(false);
+  const [contributionDialog, setContributionDialog] = useState(false);
+  const [editingGoal, setEditingGoal] = useState(null);
+  const [activeGoal, setActiveGoal] = useState(null);
+  const [goalForm, setGoalForm] = useState(EMPTY_GOAL);
+  const [contributionForm, setContributionForm] = useState(EMPTY_CONTRIBUTION);
+  const [errors, setErrors] = useState({});
+  const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (!contributionAlert) return undefined;
-    const timeoutId = window.setTimeout(() => setContributionAlert(null), 2000);
-    return () => window.clearTimeout(timeoutId);
-  }, [contributionAlert]);
+  const goals = useMemo(
+    () => buildGoalProgress(savingsGoals, contributions),
+    [savingsGoals, contributions],
+  );
 
-  const memberName = useMemo(() => {
-    const member = members.find((item) => item.id === user?.uid);
-    return member?.fullName || member?.name || user?.displayName || user?.email || "Tanpa nama";
-  }, [members, user?.displayName, user?.email, user?.uid]);
+  const totals = useMemo(() => {
+    const target = goals.reduce((sum, goal) => sum + goal.target, 0);
+    const saved = goals.reduce((sum, goal) => sum + goal.contributed, 0);
 
-  const handleCreateGoal = async () => {
-    setGoalAlert(null);
-    if (!family?.id || !name.trim() || !targetAmount || !targetDate) {
-      setGoalAlert({
-        type: "warning",
-        title: "Lengkapi nama target, nominal, dan tanggal target terlebih dahulu."
-      });
-      return;
-    }
+    return {
+      target,
+      saved,
+      remaining: Math.max(target - saved, 0),
+      percent: target > 0 ? (saved / target) * 100 : 0,
+      reached: goals.filter((goal) => goal.isReached).length
+    };
+  }, [goals]);
 
-    try {
-      await createSavingGoal(family.id, {
-        familyId: family.id,
-        userId: user?.uid || "",
-        name: name.trim(),
-        targetAmount: Number(targetAmount),
-        currentAmount: 0,
-        targetDate,
-        status: "active"
-      });
-
-      setName("");
-      setTargetAmount("");
-      setTargetDate("");
-      setGoalAlert({
-        type: "success",
-        title: "Target tabungan berhasil disimpan."
-      });
-    } catch (error) {
-      setGoalAlert({
-        type: "error",
-        title: error instanceof Error ? error.message : "Gagal menyimpan target tabungan."
-      });
-    }
+  const openCreateGoal = () => {
+    setEditingGoal(null);
+    setGoalForm(EMPTY_GOAL);
+    setErrors({});
+    setGoalDialog(true);
   };
 
-  const handleCreateContribution = async () => {
-    const goal = savingsGoals.find((item) => item.id === activeGoalId);
-    setContributionAlert(null);
-    if (!family?.id || !goal || !contributionAmount || !contributionDate) {
-      setContributionAlert({
-        type: "warning",
-        title: "Pilih target tabungan, isi nominal setoran, dan tanggal setoran."
-      });
+  const openEditGoal = (goal) => {
+    setEditingGoal(goal);
+    setGoalForm({
+      name: goal.name || "",
+      targetAmount: Number(goal.targetAmount) || null,
+      targetDate: toDateString(goal.targetDate),
+      description: goal.description || ""
+    });
+    setErrors({});
+    setGoalDialog(true);
+  };
+
+  const submitGoal = async () => {
+    const nextErrors = {};
+    if (!goalForm.name.trim()) nextErrors.name = "Nama target wajib diisi.";
+    if (!goalForm.targetAmount || goalForm.targetAmount <= 0) {
+      nextErrors.targetAmount = "Isi jumlah target.";
+    }
+    if (!goalForm.targetDate) nextErrors.targetDate = "Pilih tanggal target.";
+
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+
+    const payload = {
+      name: goalForm.name.trim(),
+      targetAmount: Number(goalForm.targetAmount),
+      targetDate: goalForm.targetDate,
+      description: goalForm.description.trim(),
+      status: "active"
+    };
+
+    setSubmitting(true);
+    const outcome = editingGoal
+      ? await mutations.update("savingGoals", editingGoal.id, payload, {
+          context: "target tabungan",
+          successMessage: "Target diperbarui."
+        })
+      : await mutations.create("savingGoals", payload, {
+          context: "target tabungan",
+          successMessage: "Target dibuat."
+        });
+    setSubmitting(false);
+
+    if (outcome.ok) setGoalDialog(false);
+  };
+
+  const submitContribution = async () => {
+    if (!contributionForm.amount || contributionForm.amount <= 0) {
+      setErrors({ amount: "Isi nominal setoran." });
       return;
     }
 
-    try {
-      const amount = Number(contributionAmount);
-      const nextCurrentAmount = Number(goal.currentAmount || 0) + amount;
-      const nextStatus = nextCurrentAmount >= Number(goal.targetAmount || 0) ? "completed" : goal.status || "active";
+    setSubmitting(true);
+    const outcome = await mutations.create(
+      "savingContributions",
+      {
+        savingGoalId: activeGoal.id,
+        goalName: activeGoal.name,
+        amount: Number(contributionForm.amount),
+        date: contributionForm.date,
+        note: contributionForm.note.trim()
+      },
+      { context: "setoran", successMessage: "Setoran tercatat." },
+    );
 
-      await createSavingContribution(family.id, {
-        familyId: family.id,
-        savingGoalId: goal.id,
-        userId: user?.uid || "",
-        amount,
-        date: contributionDate,
-        note: contributionNote.trim()
-      });
-
-      await updateSavingGoal(family.id, goal.id, {
-        currentAmount: nextCurrentAmount,
-        status: nextStatus
-      });
-
-      await createTransaction({
-        familyId: family.id,
-        payload: {
-          familyId: family.id,
-          userId: user?.uid || "",
-          createdBy: user?.uid || "",
-          ownershipType: "shared",
+    // Mirroring into cashflow is a CMS switch, so a family that tracks savings
+    // separately from spending isn't forced into double entry.
+    if (outcome.ok && workflow.automation.mirrorSavingsToCashflow) {
+      await mutations.create(
+        "transactions",
+        {
           type: "expense",
-          categoryId: "tabungan",
-          accountId: null,
-          amount,
-          date: contributionDate,
-          note: contributionNote.trim() || `Setoran tabungan ${goal.name}`,
-          tags: ["tabungan"],
-          syncStatus: "synced",
-          title: `Setoran tabungan ${goal.name}`,
-          memberName,
+          amount: Number(contributionForm.amount),
+          categoryId: null,
           categoryName: "Tabungan",
+          note: `Setoran tabungan ${activeGoal.name}`,
+          title: `Setoran tabungan ${activeGoal.name}`,
+          date: contributionForm.date,
           sourceModule: "savings",
-          relatedSavingGoalId: goal.id
-        }
-      });
+          relatedSavingGoalId: activeGoal.id
+        },
+        { context: "transaksi" },
+      );
+    }
 
-      setContributionAmount("");
-      setContributionDate(new Date().toISOString().slice(0, 10));
-      setContributionNote("");
-      setActiveGoalId("");
-      setContributionAlert({
-        type: "success",
-        title: "Setoran tabungan berhasil disimpan."
-      });
-    } catch (error) {
-      setContributionAlert({
-        type: "error",
-        title: error instanceof Error ? error.message : "Gagal menyimpan setoran tabungan."
-      });
+    setSubmitting(false);
+    if (outcome.ok) {
+      setContributionDialog(false);
+      setContributionForm(EMPTY_CONTRIBUTION);
     }
   };
+
+  const handleDeleteGoal = (goal) => {
+    toast.confirm({
+      title: `Hapus target "${goal.name}"?`,
+      content:
+        goal.contributionCount > 0
+          ? `${goal.contributionCount} setoran akan kehilangan induknya. Hapus riwayat setorannya lebih dulu bila ingin data tetap rapi.`
+          : "Target ini belum punya setoran.",
+      okText: "Hapus",
+      danger: true,
+      onOk: () =>
+        mutations.remove("savingGoals", goal.id, {
+          context: "target tabungan",
+          successMessage: "Target dihapus."
+        })
+    });
+  };
+
+  const columns = [
+    {
+      title: "Target",
+      dataIndex: "name",
+      render: (value, record) => (
+        <div className="min-w-0">
+          <Typography.Text className="!block !truncate !font-medium !text-ink">
+            {value}
+          </Typography.Text>
+          {record.description ? (
+            <Typography.Text className="!block !truncate !text-caption !text-muted">
+              {record.description}
+            </Typography.Text>
+          ) : null}
+        </div>
+      )
+    },
+    {
+      title: "Terkumpul",
+      dataIndex: "contributed",
+      width: 160,
+      align: "right",
+      sorter: (left, right) => left.contributed - right.contributed,
+      render: (value) => <Money value={value} className="!text-success-ink" />
+    },
+    {
+      title: "Target",
+      dataIndex: "target",
+      width: 150,
+      align: "right",
+      render: (value) => (
+        <Typography.Text className="!tabular-nums">{formatters.currency(value)}</Typography.Text>
+      )
+    },
+    {
+      title: "Progress",
+      key: "progress",
+      width: 220,
+      render: (_, record) => (
+        <ProgressMeter
+          value={record.contributed}
+          max={record.target}
+          size="sm"
+          warningAt={101}
+          rightHint={record.isReached ? "Tercapai" : `Sisa ${formatters.compact(record.remaining)}`}
+        />
+      )
+    },
+    {
+      title: "Jatuh tempo",
+      dataIndex: "targetDate",
+      width: 160,
+      render: (value, record) =>
+        value ? (
+          <div>
+            <Typography.Text className="!block !whitespace-nowrap !text-muted">
+              {dayjs(value).format(general.dateFormat)}
+            </Typography.Text>
+            {record.isReached ? (
+              <Badge tone="success" size="sm">
+                Selesai
+              </Badge>
+            ) : record.isOverdue ? (
+              <Badge tone="danger" size="sm">
+                Lewat {Math.abs(record.daysRemaining)} hari
+              </Badge>
+            ) : (
+              <Badge tone="neutral" size="sm">
+                {record.daysRemaining} hari lagi
+              </Badge>
+            )}
+          </div>
+        ) : (
+          "—"
+        )
+    },
+    {
+      title: "",
+      key: "actions",
+      width: 150,
+      align: "right",
+      render: (_, record) => (
+        <div className="flex justify-end gap-1">
+          <Button
+            size="small"
+            type="primary"
+            icon={<RiseOutlined />}
+            onClick={() => {
+              setActiveGoal(record);
+              setContributionForm(EMPTY_CONTRIBUTION);
+              setErrors({});
+              setContributionDialog(true);
+            }}
+          >
+            Setor
+          </Button>
+          <Button type="text" size="small" icon={<EditOutlined />} onClick={() => openEditGoal(record)} />
+          <Button
+            type="text"
+            size="small"
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() => handleDeleteGoal(record)}
+          />
+        </div>
+      )
+    }
+  ];
+
+  const renderMobileCard = (record) => (
+    <div className="p-3.5">
+      <div className="flex items-start justify-between gap-3">
+        <Typography.Text className="!min-w-0 !truncate !font-semibold !text-ink">
+          {record.name}
+        </Typography.Text>
+        {record.isReached ? <Badge tone="success">Tercapai</Badge> : null}
+      </div>
+
+      <ProgressMeter
+        className="mt-3"
+        value={record.contributed}
+        max={record.target}
+        warningAt={101}
+        leftHint={`${formatters.compact(record.contributed)} / ${formatters.compact(record.target)}`}
+        rightHint={record.targetDate ? dayjs(record.targetDate).format("DD MMM YYYY") : ""}
+      />
+
+      <div className="mt-3 flex gap-2">
+        <Button
+          size="small"
+          type="primary"
+          block
+          icon={<RiseOutlined />}
+          onClick={() => {
+            setActiveGoal(record);
+            setContributionForm(EMPTY_CONTRIBUTION);
+            setContributionDialog(true);
+          }}
+        >
+          Setor
+        </Button>
+        <Button size="small" icon={<EditOutlined />} onClick={() => openEditGoal(record)} block>
+          Ubah
+        </Button>
+      </div>
+    </div>
+  );
+
+  const recentContributions = useMemo(
+    () =>
+      [...contributions]
+        .map((item) => ({ ...item, date: toDateString(item.date) }))
+        .sort((left, right) => right.date.localeCompare(left.date))
+        .slice(0, 6),
+    [contributions],
+  );
 
   return (
-    <div className="space-y-2.5">
-      <SectionHeading eyebrow="Tabungan" title="Target dan histori setoran tabungan" />
-
-      <Card className="finance-card finance-soft-card">
-        <Space orientation="vertical" size={10} className="w-full">
-          <Typography.Title level={4} className="!m-0 !text-sm !font-bold">
-            Buat target tabungan
-          </Typography.Title>
-          {goalAlert ? (
-            <Alert
-              type={goalAlert.type}
-              showIcon
-              title={goalAlert.title}
-              closable={{ closeIcon: true, onClose: () => setGoalAlert(null), "aria-label": "close" }}
-            />
-          ) : null}
-          <Input value={name} onChange={(event) => setName(event.target.value)} size="large" placeholder="Contoh: Dana darurat" />
-          <div className="grid grid-cols-2 gap-2">
-            <InputNumber
-              value={targetAmount || null}
-              onChange={(value) => setTargetAmount(String(value || ""))}
-              size="large"
-              className="!w-full"
-              min={0}
-              controls={false}
-              placeholder="Nominal target"
-            />
-            <DatePicker
-              value={targetDate ? dayjs(targetDate) : null}
-              onChange={(value) => setTargetDate(value ? value.format("YYYY-MM-DD") : "")}
-              size="large"
-              className="!w-full"
-              format="DD MMM YYYY"
-            />
-          </div>
-          <Button type="primary" size="large" onClick={handleCreateGoal} block>
-            Simpan target tabungan
+    <div className="animate-fade-in">
+      <PageHeader
+        eyebrow="Perencanaan"
+        title="Tabungan"
+        description="Tetapkan target, catat setoran, dan pantau progresnya."
+        actions={
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreateGoal}>
+            Buat target
           </Button>
-        </Space>
-      </Card>
+        }
+      />
 
-      <Card className="finance-card finance-soft-card">
-        <Space orientation="vertical" size={10} className="w-full">
-          <Typography.Title level={4} className="!m-0 !text-sm !font-bold">
-            Input setoran tabungan
-          </Typography.Title>
-          {contributionAlert ? (
-            <Alert
-              type={contributionAlert.type}
-              showIcon
-              title={contributionAlert.title}
-              closable={{ closeIcon: true, onClose: () => setContributionAlert(null), "aria-label": "close" }}
-            />
-          ) : null}
-          <Select
-            value={activeGoalId || undefined}
-            onChange={setActiveGoalId}
-            size="large"
-            placeholder="Pilih target tabungan"
-            options={savingsGoals.map((goal) => ({ value: goal.id, label: goal.name }))}
-          />
-          <div className="grid grid-cols-2 gap-2">
-            <InputNumber
-              value={contributionAmount || null}
-              onChange={(value) => setContributionAmount(String(value || ""))}
-              size="large"
-              className="!w-full"
-              min={0}
-              controls={false}
-              placeholder="Nominal setoran"
-            />
-            <DatePicker
-              value={contributionDate ? dayjs(contributionDate) : null}
-              onChange={(value) => setContributionDate(value ? value.format("YYYY-MM-DD") : "")}
-              size="large"
-              className="!w-full"
-              format="DD MMM YYYY"
-            />
-          </div>
-          <Input.TextArea
-            value={contributionNote}
-            onChange={(event) => setContributionNote(event.target.value)}
-            autoSize={{ minRows: 3, maxRows: 5 }}
-            placeholder="Contoh: Setoran dari sisa gaji minggu ini"
-          />
-          <Button type="primary" size="large" onClick={handleCreateContribution} block>
-            Simpan setoran
-          </Button>
-        </Space>
-      </Card>
-
-      {!savingsGoals.length ? (
-        <EmptyState
-          title="Belum ada target tabungan"
-          description="Buat target tabungan dulu, lalu catat setoran agar progresnya bisa dilihat dengan jelas."
+      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard label="Total target" value={formatters.compact(totals.target)} loading={loading} />
+        <StatCard
+          label="Terkumpul"
+          value={formatters.compact(totals.saved)}
+          tone="success"
+          helper={`${Math.round(totals.percent)}% dari target`}
+          loading={loading}
         />
-      ) : null}
+        <StatCard label="Sisa" value={formatters.compact(totals.remaining)} loading={loading} />
+        <StatCard
+          label="Tercapai"
+          value={`${totals.reached}/${goals.length}`}
+          tone={totals.reached > 0 ? "success" : "default"}
+          loading={loading}
+        />
+      </div>
 
-      {savingsGoals.length ? (
-        <Card className="finance-card" styles={{ body: { padding: 0, overflow: "hidden" } }}>
-          <Table
-            size="small"
-            rowKey="id"
-            pagination={{
-              pageSize: 10,
-              size: "small",
-              showSizeChanger: false
-            }}
-            dataSource={savingsGoals}
-            onRow={(record) => ({
-              onClick: () => setSelectedGoal(record)
-            })}
-            columns={[
-              {
-                title: "Tabungan",
-                dataIndex: "name",
-                render: (value, item) => (
-                  <div>
-                    <Typography.Text strong className="!text-[13px] !font-semibold">
-                      {value}
-                    </Typography.Text>
-                    <Typography.Text className={`block !text-[11px] !font-medium ${getSavingStatusTextClass(item.status)}`}>
-                      {getSavingStatusLabel(item.status)}
-                    </Typography.Text>
-                  </div>
-                )
-              },
-              {
-                title: "Progress",
-                key: "progress",
-                width: 120,
-                render: (_, item) => {
-                  const progress = Math.min((Number(item.currentAmount || 0) / Number(item.targetAmount || 1)) * 100, 100);
-                  return (
-                    <Typography.Text className="!text-[12px] !font-medium !text-ink">
-                      {Math.round(progress)}%
-                    </Typography.Text>
-                  );
-                }
-              },
-              {
-                title: "Target",
-                dataIndex: "targetAmount",
-                width: 140,
-                align: "right",
-                render: (value) => (
-                  <Typography.Text className="!text-[12px] !font-medium !text-muted">
-                    {formatCurrency(value)}
-                  </Typography.Text>
-                )
-              }
-            ]}
+      <DataTable
+        dataSource={goals}
+        columns={columns}
+        renderMobileCard={renderMobileCard}
+        loading={loading}
+        scrollX={980}
+        emptyState={
+          <EmptyState
+            title="Belum ada target tabungan"
+            description="Target membuat menabung terasa terukur — tetapkan nominal dan tanggalnya, lalu catat setoran kapan pun."
+            action={
+              <Button type="primary" icon={<PlusOutlined />} onClick={openCreateGoal}>
+                Buat target
+              </Button>
+            }
           />
+        }
+      />
+
+      {recentContributions.length > 0 ? (
+        <Card className="mt-4 p-4">
+          <Typography.Text className="ds-eyebrow !mb-3 !block">Setoran terbaru</Typography.Text>
+          <ul className="divide-y divide-line">
+            {recentContributions.map((item) => (
+              <li key={item.id} className="flex items-center justify-between gap-3 py-2.5">
+                <div className="min-w-0">
+                  <Typography.Text className="!block !truncate !text-body !text-ink">
+                    {item.goalName || "Setoran"}
+                  </Typography.Text>
+                  <Typography.Text className="!block !text-caption !text-muted">
+                    {dayjs(item.date).format(general.dateFormat)}
+                    {item.note ? ` · ${item.note}` : ""}
+                  </Typography.Text>
+                </div>
+                <Money value={item.amount} className="!text-success-ink" />
+              </li>
+            ))}
+          </ul>
         </Card>
       ) : null}
 
-      <SavingDetailModal
-        goal={selectedGoal}
-        contributions={savingContributions.filter((item) => item.savingGoalId === selectedGoal?.id)}
-        onClose={() => setSelectedGoal(null)}
-      />
+      <ResponsiveDialog
+        open={goalDialog}
+        onClose={() => setGoalDialog(false)}
+        onSubmit={submitGoal}
+        submitting={submitting}
+        title={editingGoal ? "Ubah target" : "Buat target tabungan"}
+      >
+        <Field label="Nama target" required error={errors.name}>
+          <Input
+            size="large"
+            value={goalForm.name}
+            onChange={(event) => setGoalForm({ ...goalForm, name: event.target.value })}
+            placeholder="Contoh: Dana darurat, Liburan, Motor"
+            status={errors.name ? "error" : undefined}
+            autoFocus
+          />
+        </Field>
+
+        <Field label="Jumlah target" required error={errors.targetAmount}>
+          <MoneyField
+            value={goalForm.targetAmount}
+            onChange={(value) => setGoalForm({ ...goalForm, targetAmount: value })}
+            currencySymbol={general.currencySymbol}
+            locale={general.locale}
+            status={errors.targetAmount ? "error" : undefined}
+          />
+        </Field>
+
+        <Field label="Tanggal target" required error={errors.targetDate}>
+          <DatePicker
+            size="large"
+            className="!w-full"
+            format={general.dateFormat}
+            value={goalForm.targetDate ? dayjs(goalForm.targetDate) : null}
+            onChange={(value) =>
+              setGoalForm({ ...goalForm, targetDate: value ? value.format("YYYY-MM-DD") : "" })
+            }
+            status={errors.targetDate ? "error" : undefined}
+          />
+        </Field>
+
+        <Field label="Catatan" optional>
+          <Input.TextArea
+            value={goalForm.description}
+            onChange={(event) => setGoalForm({ ...goalForm, description: event.target.value })}
+            placeholder="Kenapa target ini penting?"
+            autoSize={{ minRows: 2, maxRows: 4 }}
+          />
+        </Field>
+      </ResponsiveDialog>
+
+      <ResponsiveDialog
+        open={contributionDialog}
+        onClose={() => setContributionDialog(false)}
+        onSubmit={submitContribution}
+        submitting={submitting}
+        title={`Setor ke ${activeGoal?.name || ""}`}
+        description={
+          activeGoal
+            ? `Terkumpul ${formatters.currency(activeGoal.contributed)} dari ${formatters.currency(activeGoal.target)}.`
+            : null
+        }
+      >
+        <Field label="Nominal setoran" required error={errors.amount}>
+          <MoneyField
+            value={contributionForm.amount}
+            onChange={(value) => setContributionForm({ ...contributionForm, amount: value })}
+            currencySymbol={general.currencySymbol}
+            locale={general.locale}
+            quickAmounts={general.quickAmounts}
+            status={errors.amount ? "error" : undefined}
+            autoFocus
+          />
+        </Field>
+
+        <Field label="Tanggal" required>
+          <DatePicker
+            size="large"
+            className="!w-full"
+            format={general.dateFormat}
+            allowClear={false}
+            value={contributionForm.date ? dayjs(contributionForm.date) : null}
+            onChange={(value) =>
+              setContributionForm({
+                ...contributionForm,
+                date: value ? value.format("YYYY-MM-DD") : ""
+              })
+            }
+          />
+        </Field>
+
+        <Field label="Catatan" optional>
+          <Input
+            size="large"
+            value={contributionForm.note}
+            onChange={(event) =>
+              setContributionForm({ ...contributionForm, note: event.target.value })
+            }
+            placeholder="Contoh: sisa gaji bulan ini"
+          />
+        </Field>
+      </ResponsiveDialog>
     </div>
   );
-}
-
-function SavingDetailModal({ goal, contributions, onClose }) {
-  const open = Boolean(goal);
-  const progress = goal
-    ? Math.min((Number(goal.currentAmount || 0) / Number(goal.targetAmount || 1)) * 100, 100)
-    : 0;
-
-  return (
-    <Modal
-      open={open}
-      onCancel={onClose}
-      footer={null}
-      title={null}
-      centered
-      width={420}
-      styles={{ content: { background: themePalette.colors.panel, padding: 16 }, body: { padding: 0 } }}
-    >
-      {goal ? (
-        <Space orientation="vertical" size={12} className="w-full">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <Typography.Title level={4} className="!mb-0 !text-[15px]">
-                {goal.name}
-              </Typography.Title>
-              <Typography.Text className="mt-1 block !text-[12px] !text-muted">
-                Target selesai {formatDate(goal.targetDate)}
-              </Typography.Text>
-            </div>
-            <Tag className={`rounded-full border-0 px-3 py-1 text-xs font-semibold ${getSavingStatusTagClass(goal.status)}`}>
-              {getSavingStatusLabel(goal.status)}
-            </Tag>
-          </div>
-
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between gap-3">
-              <Typography.Text className="text-[11px] font-medium text-muted">
-                Terkumpul {formatCurrency(goal.currentAmount || 0)} dari {formatCurrency(goal.targetAmount || 0)}
-              </Typography.Text>
-            </div>
-            <Progress
-              percent={Math.round(progress)}
-              strokeColor={themePalette.colors.primaryStrong}
-              railColor={themePalette.colors.progressRail}
-            />
-          </div>
-
-          <div>
-            <Typography.Text className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
-              Riwayat setoran
-            </Typography.Text>
-            <div className="mt-2.5 max-h-[248px] overflow-y-auto rounded-[12px] border border-line">
-              {contributions.length ? (
-                contributions.map((item, index) => (
-                  <div
-                    key={item.id}
-                    className={`bg-panel px-3 py-2 ${index === contributions.length - 1 ? "" : "border-b border-line"}`}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <Typography.Text strong className="!text-[13px] !font-semibold">
-                        {formatCurrency(item.amount)}
-                      </Typography.Text>
-                      <Typography.Text className="!text-[11px] !text-muted">
-                        {formatDate(item.date)}
-                      </Typography.Text>
-                    </div>
-                    <Typography.Text className="mt-0.5 block !text-[12px] !text-muted">
-                      {item.note || "Setoran tabungan"}
-                    </Typography.Text>
-                  </div>
-                ))
-              ) : (
-                <Alert type="info" showIcon title="Belum ada setoran pada target ini." />
-              )}
-            </div>
-          </div>
-        </Space>
-      ) : null}
-    </Modal>
-  );
-}
-
-function getSavingStatusLabel(status) {
-  switch (status) {
-    case "completed":
-      return "Selesai";
-    case "paused":
-      return "Dijeda";
-    default:
-      return "Aktif";
-  }
-}
-
-function getSavingStatusTagClass(status) {
-  switch (status) {
-    case "completed":
-      return "bg-income/15 text-income";
-    case "paused":
-      return "bg-warning/15 text-warning";
-    default:
-      return "bg-primary/15 text-primary";
-  }
-}
-
-function getSavingStatusTextClass(status) {
-  switch (status) {
-    case "completed":
-      return "!text-income";
-    case "paused":
-      return "!text-warning";
-    default:
-      return "!text-primary";
-  }
 }

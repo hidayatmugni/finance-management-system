@@ -1,76 +1,178 @@
 import { theme as antdTheme } from "antd";
-import { themePalette } from "../shared/config/themePalette";
+import { getTheme, shadeColor } from "../shared/design/themes";
+import { radii, typeScale } from "../shared/design/tokens";
 
-export const appTheme = {
-  algorithm: antdTheme.darkAlgorithm,
-  token: {
-    colorPrimary: themePalette.colors.primary,
-    colorSuccess: themePalette.colors.success,
-    colorWarning: themePalette.colors.warning,
-    colorError: themePalette.colors.expense,
-    colorInfo: themePalette.colors.info,
-    colorTextBase: themePalette.colors.ink,
-    colorBgBase: themePalette.colors.canvas,
-    colorBgLayout: themePalette.colors.canvas,
-    colorBgContainer: themePalette.colors.panel,
-    colorBorder: themePalette.colors.line,
-    colorSplit: themePalette.colors.lineSoft,
-    colorTextSecondary: themePalette.colors.muted,
-    fontFamily: themePalette.fontFamily,
-    borderRadius: 14,
-    borderRadiusLG: 16,
-    borderRadiusSM: 10,
-    boxShadowSecondary: themePalette.shadows.cardStrong
-  },
-  components: {
-    Layout: {
-      headerBg: "rgba(22, 19, 33, 0.94)",
-      bodyBg: themePalette.colors.canvas,
-      footerBg: "rgba(22, 19, 33, 0.96)"
+/**
+ * Translates one of our themes into an Ant Design token set.
+ *
+ * Ant components are styled from these tokens rather than from CSS overrides,
+ * so a theme switch repaints buttons, tables, modals and pickers in one go.
+ *
+ * @param {string} themeId
+ * @param {{ primaryColor?: string, radiusScale?: number, compact?: boolean, fontScale?: number }} overrides
+ */
+export function buildAntdTheme(themeId, overrides = {}) {
+  const theme = getTheme(themeId);
+  const colors = theme.colors;
+  const isDark = theme.mode === "dark";
+
+  const primary = overrides.primaryColor || colors.primary;
+  const radiusScale = overrides.radiusScale ?? 1;
+  const fontScale = overrides.fontScale ?? 1;
+  const scaleRadius = (value) => Math.round(value * radiusScale);
+  const scaleFont = (value) => Math.round(value * fontScale);
+  const controlHeight = overrides.compact ? 34 : 38;
+
+  const algorithms = [isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm];
+  if (overrides.compact) algorithms.push(antdTheme.compactAlgorithm);
+
+  return {
+    algorithm: algorithms,
+    token: {
+      colorPrimary: primary,
+      colorPrimaryHover: shadeColor(primary, isDark ? 10 : -10),
+      colorPrimaryActive: shadeColor(primary, isDark ? -10 : -22),
+      colorPrimaryBg: colors.primarySoft,
+      colorPrimaryBorder: colors.primaryBorder,
+
+      colorSuccess: colors.success,
+      colorWarning: colors.warning,
+      colorError: colors.danger,
+      colorInfo: colors.info,
+
+      colorTextBase: colors.text,
+      colorText: colors.text,
+      colorTextSecondary: colors.textSecondary,
+      colorTextTertiary: colors.textTertiary,
+      colorTextQuaternary: colors.textTertiary,
+      colorTextDescription: colors.textSecondary,
+      colorTextPlaceholder: colors.textTertiary,
+
+      colorBgBase: colors.surface,
+      colorBgLayout: colors.bg,
+      colorBgContainer: colors.surface,
+      colorBgElevated: colors.surfaceRaised,
+      colorBgSpotlight: colors.surfaceRaised,
+      colorFillAlter: colors.surfaceSunken,
+      colorFillSecondary: colors.surfaceSunken,
+      colorFillTertiary: colors.surfaceHover,
+      colorFillQuaternary: colors.surfaceHover,
+
+      colorBorder: colors.border,
+      colorBorderSecondary: colors.border,
+      colorSplit: colors.border,
+
+      fontFamily: theme.fonts.body,
+      fontSize: scaleFont(typeScale.body),
+      fontSizeSM: scaleFont(typeScale.small),
+      fontSizeLG: scaleFont(typeScale.subtitle),
+      fontSizeHeading1: scaleFont(typeScale.display),
+      fontSizeHeading2: scaleFont(typeScale.headline),
+      fontSizeHeading3: scaleFont(typeScale.title),
+      fontSizeHeading4: scaleFont(typeScale.subtitle),
+      fontSizeHeading5: scaleFont(typeScale.bodyLarge),
+
+      borderRadius: scaleRadius(radii.md),
+      borderRadiusLG: scaleRadius(radii.lg),
+      borderRadiusSM: scaleRadius(radii.sm),
+      borderRadiusXS: scaleRadius(radii.xs),
+
+      controlHeight,
+      controlHeightLG: controlHeight + 6,
+      controlHeightSM: controlHeight - 6,
+
+      boxShadow: theme.shadows.sm,
+      boxShadowSecondary: theme.shadows.md,
+      boxShadowTertiary: theme.shadows.xs,
+      wireframe: false
     },
-    Card: {
-      bodyPadding: 12,
-      headerFontSize: 14,
-      headerHeight: 40
-    },
-    Button: {
-      controlHeight: 38,
-      borderRadius: 10
-    },
-    Input: {
-      controlHeight: 38
-    },
-    Select: {
-      controlHeight: 38
-    },
-    Table: {
-      headerBg: themePalette.colors.panelHeader,
-      headerColor: themePalette.colors.inkSoft,
-      rowHoverBg: themePalette.colors.panelHover
-    },
-    Segmented: {
-      trackBg: themePalette.colors.panelHeader
-    },
-    Tabs: {
-      itemColor: themePalette.colors.muted,
-      itemSelectedColor: themePalette.colors.primary,
-      itemHoverColor: themePalette.colors.primary,
-      inkBarColor: themePalette.colors.primary
-    },
-    Input: {
-      activeBorderColor: themePalette.colors.primary,
-      hoverBorderColor: themePalette.colors.primary
-    },
-    Select: {
-      activeBorderColor: themePalette.colors.primary,
-      hoverBorderColor: themePalette.colors.primary
-    },
-    Radio: {
-      buttonSolidCheckedBg: themePalette.colors.primaryStrong,
-      buttonSolidCheckedHoverBg: themePalette.colors.primaryStrong,
-      buttonCheckedBg: themePalette.colors.primarySoft,
-      buttonCheckedHoverBg: themePalette.colors.primarySoft,
-      buttonColor: themePalette.colors.ink
+    components: {
+      Layout: {
+        headerBg: colors.surface,
+        bodyBg: colors.bg,
+        siderBg: colors.surface,
+        footerBg: colors.surface,
+        headerPadding: 0
+      },
+      Card: {
+        headerBg: "transparent",
+        headerFontSize: scaleFont(typeScale.bodyLarge),
+        headerHeight: 48,
+        bodyPadding: 16,
+        colorBorderSecondary: colors.border
+      },
+      Button: {
+        primaryShadow: "none",
+        defaultShadow: "none",
+        dangerShadow: "none",
+        primaryColor: colors.onPrimary,
+        fontWeight: 500
+      },
+      Table: {
+        headerBg: colors.surfaceSunken,
+        headerColor: colors.textSecondary,
+        headerSplitColor: colors.border,
+        rowHoverBg: colors.surfaceHover,
+        rowSelectedBg: colors.primarySoft,
+        rowSelectedHoverBg: colors.primarySoft,
+        borderColor: colors.border,
+        cellPaddingBlock: 10,
+        cellPaddingBlockSM: 8
+      },
+      Segmented: {
+        trackBg: colors.surfaceSunken,
+        itemSelectedBg: colors.surface,
+        itemSelectedColor: primary,
+        itemHoverBg: colors.surfaceHover,
+        trackPadding: 3
+      },
+      Tabs: {
+        itemColor: colors.textSecondary,
+        itemSelectedColor: primary,
+        itemHoverColor: primary,
+        inkBarColor: primary,
+        titleFontSize: scaleFont(typeScale.body),
+        horizontalMargin: "0 0 16px 0"
+      },
+      Menu: {
+        itemBg: "transparent",
+        subMenuItemBg: "transparent",
+        itemSelectedBg: colors.primarySoft,
+        itemSelectedColor: primary,
+        itemHoverBg: colors.surfaceHover,
+        itemBorderRadius: scaleRadius(radii.md),
+        itemMarginInline: 0
+      },
+      Input: { activeShadow: `0 0 0 3px ${primary}33`, addonBg: colors.surfaceSunken },
+      InputNumber: { activeShadow: `0 0 0 3px ${primary}33` },
+      Select: { optionSelectedBg: colors.primarySoft, optionSelectedColor: primary },
+      DatePicker: { cellActiveWithRangeBg: colors.primarySoft },
+      Modal: {
+        titleFontSize: scaleFont(typeScale.subtitle),
+        borderRadiusLG: scaleRadius(radii.xl),
+        contentBg: colors.surface,
+        headerBg: colors.surface
+      },
+      Drawer: { footerPaddingBlock: 12 },
+      Progress: { defaultColor: primary, remainingColor: colors.surfaceSunken },
+      Tag: { defaultBg: colors.surfaceSunken, defaultColor: colors.textSecondary },
+      Alert: {
+        colorInfoBg: colors.infoSoft,
+        colorInfoBorder: colors.infoSoft,
+        colorSuccessBg: colors.successSoft,
+        colorSuccessBorder: colors.successSoft,
+        colorWarningBg: colors.warningSoft,
+        colorWarningBorder: colors.warningSoft,
+        colorErrorBg: colors.dangerSoft,
+        colorErrorBorder: colors.dangerSoft
+      },
+      Tooltip: {
+        colorBgSpotlight: isDark ? colors.surfaceRaised : colors.text,
+        colorTextLightSolid: isDark ? colors.text : colors.textInverse
+      },
+      Statistic: { contentFontSize: scaleFont(typeScale.title) },
+      Divider: { colorSplit: colors.border },
+      Empty: { colorTextDescription: colors.textTertiary }
     }
-  }
-};
+  };
+}

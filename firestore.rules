@@ -1,0 +1,113 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isFamilyMember(familyId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/families/$(familyId)/members/$(request.auth.uid));
+    }
+
+    function hasFamilyProfile(familyId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.familyId == familyId;
+    }
+
+    function canAccessFamily(familyId) {
+      return isFamilyMember(familyId) || hasFamilyProfile(familyId);
+    }
+
+    function memberRole(familyId) {
+      return get(/databases/$(database)/documents/families/$(familyId)/members/$(request.auth.uid)).data.role;
+    }
+
+    function isFamilyOwner(familyId) {
+      return isFamilyMember(familyId) && memberRole(familyId) == 'owner';
+    }
+
+    function isFamilyAdmin(familyId) {
+      return isFamilyMember(familyId) && memberRole(familyId) in ['owner', 'admin'];
+    }
+
+    match /users/{userId} {
+      allow read, write: if isSelf(userId);
+      // Owners may adjust another member's role, which mirrors onto their profile.
+      allow update: if isSignedIn() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role', 'updatedAt']);
+    }
+
+    match /families/{familyId} {
+      // Any signed-in user may read the family document so the very first login
+      // can bootstrap itself before a member record exists.
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isFamilyAdmin(familyId);
+
+      match /members/{memberId} {
+        allow read: if canAccessFamily(familyId) || isSelf(memberId);
+        // A new sign-in provisions its own member record; only owners and
+        // admins may touch anyone else's.
+        allow create: if isSelf(memberId) || isFamilyAdmin(familyId);
+        allow update: if isSelf(memberId) || isFamilyAdmin(familyId);
+        allow delete: if isFamilyOwner(familyId);
+      }
+
+      /* ---- Day-to-day data: any member of the family reads and writes. ---- */
+
+      match /transactions/{documentId} {
+        allow read, write: if canAccessFamily(familyId);
+      }
+
+      match /categories/{documentId} {
+        allow read, write: if canAccessFamily(familyId);
+      }
+
+      match /accounts/{documentId} {
+        allow read, write: if canAccessFamily(familyId);
+      }
+
+      // Budgets previously had no rule at all, so every save failed with
+      // permission-denied. They follow the same access as other household data.
+      match /budgets/{documentId} {
+        allow read, write: if canAccessFamily(familyId);
+      }
+
+      match /savingGoals/{documentId} {
+        allow read, write: if canAccessFamily(familyId);
+      }
+
+      match /savingContributions/{documentId} {
+        allow read, write: if canAccessFamily(familyId);
+      }
+
+      match /financeRecords/{documentId} {
+        allow read, write: if canAccessFamily(familyId);
+      }
+
+      match /financePayments/{documentId} {
+        allow read, write: if canAccessFamily(familyId);
+      }
+
+      /* ---- CMS: everyone reads it (the UI is built from it), admins write. ---- */
+
+      match /appConfig/{section} {
+        allow read: if canAccessFamily(familyId);
+        allow write: if isFamilyAdmin(familyId);
+      }
+
+      match /syncLogs/{logId} {
+        allow read: if isFamilyAdmin(familyId);
+        allow write: if false;
+      }
+    }
+  }
+}

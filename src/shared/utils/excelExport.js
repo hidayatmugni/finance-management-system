@@ -1,8 +1,13 @@
 import dayjs from "dayjs";
 import ExcelJS from "exceljs";
-import { buildCategoryBreakdown, buildFinanceSummary, buildMonthlyTrend, buildUserInputSummary } from "./finance";
+import {
+  buildCategoryBreakdownLegacy as buildCategoryBreakdown,
+  buildFinanceSummaryLegacy as buildFinanceSummary,
+  buildMonthlyTrendLegacy as buildMonthlyTrend,
+  buildUserInputSummaryLegacy as buildUserInputSummary,
+  getKategoriNameLegacy as getKategoriName
+} from "./excelAdapters";
 import { getBookMonthRange, inDateRange, isInBookYear } from "./dateFilters";
-import { getKategoriName } from "../config/cashflow";
 
 const COLORS = {
   primary: "FF1E293B",
