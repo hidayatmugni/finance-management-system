@@ -15,22 +15,28 @@ export default defineConfig({
     rollupOptions: {
       output: {
         /**
-         * Vendors are split so a change in app code never invalidates the
-         * cached copy of React/antd/Firebase, and so the heavy optional
-         * dependencies (ExcelJS, Recharts) stay out of the first paint.
+         * Only split dependency trees that are genuinely self-contained.
+         *
+         * Splitting antd from @ant-design/icons produced two chunks that import
+         * each other (antd renders icons; icons pull in antd's rc-* utilities).
+         * Rollup cannot order a cycle, so one chunk evaluated before the other
+         * had defined its bindings and the app died at runtime with
+         * "Cannot access 'ft' before initialization". React, antd, the icon set
+         * and the router therefore stay together — the shared total is
+         * identical, only the file count differs.
+         *
+         * ExcelJS, Recharts and Firebase have no edge back into the UI tree, so
+         * they split safely — and that is where the real win is: ExcelJS alone
+         * is ~940 kB and is only fetched when someone exports.
          */
         manualChunks(id) {
           if (!id.includes("node_modules")) return undefined;
 
           if (id.includes("exceljs") || id.includes("xlsx")) return "vendor-excel";
-          if (id.includes("recharts") || id.includes("d3-")) return "vendor-charts";
-          if (id.includes("firebase") || id.includes("@firebase")) return "vendor-firebase";
-          if (id.includes("@ant-design/icons")) return "vendor-icons";
-          if (id.includes("antd") || id.includes("rc-")) return "vendor-antd";
-          if (id.includes("react-router")) return "vendor-router";
-          if (id.includes("/react/") || id.includes("react-dom") || id.includes("scheduler")) {
-            return "vendor-react";
+          if (id.includes("recharts") || id.includes("d3-") || id.includes("victory-vendor")) {
+            return "vendor-charts";
           }
+          if (id.includes("firebase") || id.includes("@firebase")) return "vendor-firebase";
 
           return "vendor";
         }

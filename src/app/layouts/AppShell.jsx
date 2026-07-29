@@ -6,7 +6,7 @@ import {
   PlusOutlined,
   SearchOutlined
 } from "@ant-design/icons";
-import { Avatar, Button, Drawer, Dropdown, Layout, Tooltip, Typography } from "antd";
+import { Alert, Avatar, Button, Drawer, Dropdown, Layout, Tooltip, Typography } from "antd";
 import { Suspense, useCallback, useMemo, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../features/auth/AuthProvider";
@@ -30,7 +30,7 @@ import { CommandPalette } from "./CommandPalette";
  * file.
  */
 export function AppShell() {
-  const { logout, user, profile } = useAuth();
+  const { logout, user, profile, provisionError } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const toast = useToast();
@@ -198,6 +198,27 @@ export function AppShell() {
 
         <Layout.Content className="px-3 pb-28 pt-4 md:px-5 md:pb-8">
           <div className="mx-auto w-full max-w-[1640px]">
+            {/* The session is valid but its Firestore records are missing —
+                almost always un-deployed rules or a freshly wiped database. */}
+            {provisionError ? (
+              <Alert
+                className="!mb-4"
+                type="warning"
+                showIcon
+                title="Data akun belum tersimpan di Firestore"
+                description={
+                  provisionError.code === "permission-denied"
+                    ? "Firestore Rules menolak penulisan. Deploy ulang firestore.rules, lalu muat ulang halaman ini."
+                    : provisionError.message
+                }
+                action={
+                  <Button size="small" onClick={() => window.location.reload()}>
+                    Muat ulang
+                  </Button>
+                }
+              />
+            ) : null}
+
             <Suspense fallback={<PageSkeleton />}>
               <Outlet />
             </Suspense>

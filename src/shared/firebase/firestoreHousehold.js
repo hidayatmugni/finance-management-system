@@ -195,10 +195,17 @@ export async function ensureUserProvisioned(user) {
 
   const memberRef = doc(db, "families", familyId, "members", user.uid);
   const memberSnap = await getDoc(memberRef);
-  const fallbackRole = !familySnap.exists() ? "owner" : "member";
-  const role = memberSnap.exists()
-    ? memberSnap.data().role || existingUser?.role || fallbackRole
-    : existingUser?.role || fallbackRole;
+
+  /*
+   * Whoever re-creates the family becomes its owner — including after the
+   * Firestore data has been wiped. A leftover `users/{uid}` profile saying
+   * "member" must not win here, or the person rebuilding the workspace would
+   * lock themselves out of the Configuration Center.
+   */
+  const isBootstrapping = !familySnap.exists();
+  const role = isBootstrapping
+    ? "owner"
+    : memberSnap.data()?.role || existingUser?.role || "member";
 
   const profile = {
     uid: user.uid,
