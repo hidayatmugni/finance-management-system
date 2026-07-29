@@ -14,7 +14,7 @@ import {
   writeBatch
 } from "firebase/firestore";
 import { db } from "./client.js";
-import { globalFamilyId, globalFamilyName } from "./config.js";
+import { globalFamilyId, globalFamilyName, isOwnerEmail } from "./config.js";
 
 /**
  * Firestore access for everything under `families/{familyId}`.
@@ -197,15 +197,26 @@ export async function ensureUserProvisioned(user) {
   const memberSnap = await getDoc(memberRef);
 
   /*
-   * Whoever re-creates the family becomes its owner — including after the
-   * Firestore data has been wiped. A leftover `users/{uid}` profile saying
-   * "member" must not win here, or the person rebuilding the workspace would
-   * lock themselves out of the Configuration Center.
+   * Role resolution, highest authority first:
+   *
+   *   1. The owner allowlist — always wins, so a corrupted or manually edited
+   *      record can never lock these accounts out.
+   *   2. Bootstrapping — whoever re-creates the family owns it, which is what
+   *      makes the app recoverable after the database is wiped.
+   *   3. The member record — the authoritative store for everyone else.
+   *   4. The `users` profile, then plain member as the floor.
+   *
+   * Note the member record outranks the `users` profile: editing `users` by
+   * hand looks like it works but is overwritten on the next sign-in, because
+   * that document is only a mirror. Promote people from the Members page (or
+   * edit the member record) instead.
    */
   const isBootstrapping = !familySnap.exists();
-  const role = isBootstrapping
+  const role = isOwnerEmail(user.email)
     ? "owner"
-    : memberSnap.data()?.role || existingUser?.role || "member";
+    : isBootstrapping
+      ? "owner"
+      : memberSnap.data()?.role || existingUser?.role || "member";
 
   const profile = {
     uid: user.uid,

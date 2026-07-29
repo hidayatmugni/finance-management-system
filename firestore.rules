@@ -3,6 +3,26 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    /*
+     * Break-glass owners. Mirrors `ownerEmails` in src/shared/firebase/config.js
+     * — the client decides what role to write, these rules decide what is
+     * actually allowed, so the two lists must stay in step.
+     *
+     * These accounts keep full access even if their member record is missing,
+     * corrupted, or demoted, which is what makes the workspace recoverable.
+     */
+    function superAdminEmails() {
+      return ['mugnihidayat023@gmail.com'];
+    }
+
+    function isSuperAdmin() {
+      // The null check matters: calling .lower() on a missing email aborts rule
+      // evaluation entirely, which would deny even legitimate requests.
+      return isSignedIn() &&
+        request.auth.token.email != null &&
+        request.auth.token.email.lower() in superAdminEmails();
+    }
+
     function isSignedIn() {
       return request.auth != null;
     }
@@ -23,7 +43,7 @@ service cloud.firestore {
     }
 
     function canAccessFamily(familyId) {
-      return isFamilyMember(familyId) || hasFamilyProfile(familyId);
+      return isFamilyMember(familyId) || hasFamilyProfile(familyId) || isSuperAdmin();
     }
 
     function memberRole(familyId) {
@@ -35,14 +55,25 @@ service cloud.firestore {
     }
 
     function isFamilyAdmin(familyId) {
-      return isFamilyMember(familyId) && memberRole(familyId) in ['owner', 'admin'];
+      // Break-glass owners count as admins everywhere, including the CMS, so a
+      // broken member record can always be repaired from inside the app.
+      return isSuperAdmin() ||
+        (isFamilyMember(familyId) && memberRole(familyId) in ['owner', 'admin']);
     }
 
     match /users/{userId} {
-      allow read, write: if isSelf(userId);
-      // Owners may adjust another member's role, which mirrors onto their profile.
-      allow update: if isSignedIn() &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role', 'updatedAt']);
+      allow read: if isSelf(userId) || isSuperAdmin();
+      allow create, delete: if isSelf(userId) || isSuperAdmin();
+
+      /*
+       * Users may maintain their own profile but NOT their own role — the
+       * previous version allowed any signed-in account to rewrite anybody's
+       * role, which let a member promote themselves to owner. Role changes now
+       * come only from a family admin (the Members page) or a break-glass owner.
+       */
+      allow update: if isSuperAdmin()
+        || (isSelf(userId) && request.resource.data.role == resource.data.role)
+        || isFamilyAdmin(resource.data.familyId);
     }
 
     match /families/{familyId} {
@@ -54,11 +85,17 @@ service cloud.firestore {
 
       match /members/{memberId} {
         allow read: if canAccessFamily(familyId) || isSelf(memberId);
-        // A new sign-in provisions its own member record; only owners and
-        // admins may touch anyone else's.
-        allow create: if isSelf(memberId) || isFamilyAdmin(familyId);
-        allow update: if isSelf(memberId) || isFamilyAdmin(familyId);
-        allow delete: if isFamilyOwner(familyId);
+
+        // A new sign-in provisions its own member record.
+        allow create: if isSelf(memberId) || isFamilyAdmin(familyId) || isSuperAdmin();
+
+        // Own profile: yes. Own role: no — otherwise any member could promote
+        // themselves. Promotion goes through an admin or a break-glass owner.
+        allow update: if isFamilyAdmin(familyId)
+          || isSuperAdmin()
+          || (isSelf(memberId) && request.resource.data.role == resource.data.role);
+
+        allow delete: if isFamilyOwner(familyId) || isSuperAdmin();
       }
 
       /* ---- Day-to-day data: any member of the family reads and writes. ---- */
