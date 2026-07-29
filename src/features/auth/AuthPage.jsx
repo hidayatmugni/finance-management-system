@@ -11,7 +11,7 @@ import { useAuth } from "./AuthProvider";
 /** Sign-in screen. Accounts are provisioned in Firebase, so there is no signup. */
 export function AuthPage() {
   const navigate = useNavigate();
-  const { login, isFirebaseReady } = useAuth();
+  const { login, isFirebaseReady, projectId } = useAuth();
   const general = useConfigSection("general");
 
   const [values, setValues] = useState({ email: "", password: "" });
@@ -119,11 +119,19 @@ export function AuthPage() {
           </form>
         </Card>
 
+        {/* Naming the project turns "kok tidak bisa login" into a one-glance
+            diagnosis when the environment variables point somewhere else. */}
         <Typography.Text className="!mt-4 !block !text-center !text-caption !text-muted">
-          Status Firebase:{" "}
+          Firebase:{" "}
           <span className={isFirebaseReady ? "text-success-ink" : "text-danger-ink"}>
             {isFirebaseReady ? "siap" : "konfigurasi belum lengkap"}
           </span>
+          {projectId ? (
+            <>
+              {" · project "}
+              <span className="font-mono text-ink">{projectId}</span>
+            </>
+          ) : null}
         </Typography.Text>
       </div>
     </div>
