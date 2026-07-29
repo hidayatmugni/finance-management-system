@@ -1,4 +1,4 @@
-# Mugni Finance 💰
+# Finance Management System
 
 Professional family finance management application with **dynamic settings, per-category budgeting, advanced analytics, and scalable architecture** built with React, Tailwind CSS, and Firebase.
 
