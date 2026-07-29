@@ -1,726 +1,523 @@
+import { DeleteOutlined, DollarOutlined, EditOutlined, PlusOutlined } from "@ant-design/icons";
+import { Alert, Button, DatePicker, Input, Segmented, Typography } from "antd";
 import dayjs from "dayjs";
-import { useEffect, useMemo, useState } from "react";
-import { Alert, Button, Card, DatePicker, Input, InputNumber, Modal, Progress, Radio, Select, Space, Table, Tag, Typography } from "antd";
-import { EmptyState } from "../../shared/components/EmptyState";
-import { SectionHeading } from "../../shared/components/SectionHeading";
-import { formatCurrency, formatDate } from "../../shared/utils/format";
-import {
-  createFinancePayment,
-  createFinanceRecord,
-  updateFinanceRecord
-} from "../../shared/firebase/firestoreHousehold.js";
-import { useAuth } from "../auth/AuthProvider";
+import { useMemo, useState } from "react";
+import { useConfigSection, useFormatters } from "../../shared/config/useAppConfig";
+import { useStatuses } from "../../shared/data/useCatalogue";
+import { useMutations } from "../../shared/data/useMutations";
 import { useFinanceStore } from "../../shared/state/useFinanceStore";
-import { createTransaction } from "../../shared/firebase/firestoreTransactions";
-import { themePalette } from "../../shared/config/themePalette";
+import {
+  Badge,
+  DataTable,
+  EmptyState,
+  Field,
+  Money,
+  MoneyField,
+  PageHeader,
+  ProgressMeter,
+  ResponsiveDialog,
+  StatCard,
+  useToast
+} from "../../shared/ui";
+import { buildFinanceRecords } from "../../shared/utils/finance";
 
+const EMPTY_RECORD = { personName: "", amount: null, dueDate: "", description: "" };
+const EMPTY_PAYMENT = { amount: null, date: dayjs().format("YYYY-MM-DD"), note: "" };
+
+/**
+ * Debts and receivables.
+ *
+ * The remaining balance is always recomputed from the payment log, so a
+ * corrected or deleted payment can never leave a record showing the wrong
+ * outstanding amount.
+ */
 export function DebtsPage() {
-  const family = useFinanceStore((state) => state.family);
+  const toast = useToast();
+  const mutations = useMutations();
+  const formatters = useFormatters();
+  const general = useConfigSection("general");
+  const workflow = useConfigSection("workflow");
+  const { get: getStatus } = useStatuses("financeRecord");
+
   const financeRecords = useFinanceStore((state) => state.financeRecords);
   const financePayments = useFinanceStore((state) => state.financePayments);
-  const members = useFinanceStore((state) => state.members);
-  const { user } = useAuth();
+  const loading = useFinanceStore((state) => state.loading.finance);
+
   const [recordType, setRecordType] = useState("debt");
-  const [assetKind, setAssetKind] = useState("goods");
-  const [personName, setPersonName] = useState("");
-  const [amountInitial, setAmountInitial] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("installment");
-  const [installmentMonths, setInstallmentMonths] = useState("12");
-  const [dueDate, setDueDate] = useState("");
-  const [activeRecordId, setActiveRecordId] = useState("");
-  const [paymentAmount, setPaymentAmount] = useState("");
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
-  const [paymentNote, setPaymentNote] = useState("");
-  const [recordAlert, setRecordAlert] = useState(null);
-  const [paymentAlert, setPaymentAlert] = useState(null);
-  const [selectedRecord, setSelectedRecord] = useState(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [paymentDialog, setPaymentDialog] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [activeRecord, setActiveRecord] = useState(null);
+  const [form, setForm] = useState(EMPTY_RECORD);
+  const [paymentForm, setPaymentForm] = useState(EMPTY_PAYMENT);
+  const [errors, setErrors] = useState({});
+  const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (!recordAlert) return undefined;
-    const timeoutId = window.setTimeout(() => setRecordAlert(null), 2000);
-    return () => window.clearTimeout(timeoutId);
-  }, [recordAlert]);
-
-  useEffect(() => {
-    if (!paymentAlert) return undefined;
-    const timeoutId = window.setTimeout(() => setPaymentAlert(null), 2000);
-    return () => window.clearTimeout(timeoutId);
-  }, [paymentAlert]);
-
-  const memberName = useMemo(() => {
-    const member = members.find((item) => item.id === user?.uid);
-    return member?.fullName || member?.name || user?.displayName || user?.email || "Tanpa nama";
-  }, [members, user?.displayName, user?.email, user?.uid]);
-
-  const payableRecordOptions = useMemo(
-    () =>
-      financeRecords
-        .filter((item) => item.status !== "paid")
-        .map((record) => ({
-          value: record.id,
-          label: record.personName || "Tanpa nama"
-        })),
-    [financeRecords],
+  const allRecords = useMemo(
+    () => buildFinanceRecords(financeRecords, financePayments),
+    [financeRecords, financePayments],
   );
 
-  const handleCreateRecord = async () => {
-    setRecordAlert(null);
-    if (!family?.id || !personName.trim() || !amountInitial || !dueDate) {
-      setRecordAlert({
-        type: "warning",
-        title: "Lengkapi nama, nominal, dan tanggal jatuh tempo terlebih dahulu."
-      });
-      return;
-    }
+  const rows = useMemo(
+    () => allRecords.filter((record) => record.recordType === recordType),
+    [allRecords, recordType],
+  );
 
-    try {
-      const totalMonths = paymentMethod === "single" ? 1 : Number(installmentMonths || 1);
-      const initialAmount = Number(amountInitial);
-      const startDate = new Date().toISOString().slice(0, 10);
-      const cleanPersonName = personName.trim();
-      const isDebt = recordType === "debt";
-      const normalizedAssetKind = normalizeFinanceAssetKind(assetKind);
-      const shouldTrackInitialCashflow = normalizedAssetKind === "money";
+  const counts = useMemo(
+    () => ({
+      debt: allRecords.filter((item) => item.recordType === "debt" && !item.isSettled).length,
+      receivable: allRecords.filter((item) => item.recordType === "receivable" && !item.isSettled)
+        .length
+    }),
+    [allRecords],
+  );
 
-      const recordRef = await createFinanceRecord(family.id, {
-        familyId: family.id,
-        userId: user?.uid || "",
-        recordType,
-        assetKind: normalizedAssetKind,
-        personName: cleanPersonName,
-        amountInitial: initialAmount,
-        amountRemaining: initialAmount,
-        totalPaid: 0,
-        paymentCount: 0,
-        paymentMethod,
-        installmentMonths: totalMonths,
-        installmentAmount: Math.ceil(initialAmount / totalMonths),
-        startDate,
-        dueDate,
-        status: "active",
-        note: ""
-      });
+  const stats = useMemo(() => {
+    const active = rows.filter((item) => !item.isSettled);
+    return {
+      activeCount: active.length,
+      principal: active.reduce((sum, item) => sum + item.principal, 0),
+      paid: rows.reduce((sum, item) => sum + item.paid, 0),
+      remaining: active.reduce((sum, item) => sum + item.remaining, 0),
+      overdue: active.filter((item) => item.isOverdue)
+    };
+  }, [rows]);
 
-      if (shouldTrackInitialCashflow) {
-        await createTransaction({
-          familyId: family.id,
-          payload: {
-            familyId: family.id,
-            userId: user?.uid || "",
-            createdBy: user?.uid || "",
-            ownershipType: "shared",
-            type: isDebt ? "income" : "expense",
-            categoryId: isDebt ? "lainnya_income" : "lainnya_expense",
-            accountId: null,
-            amount: initialAmount,
-            date: startDate,
-            note: isDebt ? `Pencairan hutang dari ${cleanPersonName}` : `Memberi piutang ke ${cleanPersonName}`,
-            tags: [isDebt ? "hutang_awal" : "piutang_awal"],
-            syncStatus: "synced",
-            title: isDebt ? `Hutang dari ${cleanPersonName}` : `Piutang ke ${cleanPersonName}`,
-            memberName,
-            categoryName: "Lainnya",
-            sourceModule: "finance-record",
-            financeRecordType: recordType,
-            financeAssetKind: normalizedAssetKind,
-            relatedFinanceRecordId: recordRef.id
-          }
+  const isDebt = recordType === "debt";
+  const partyLabel = isDebt ? "Pemberi pinjaman" : "Penerima pinjaman";
+
+  const openCreate = () => {
+    setEditing(null);
+    setForm(EMPTY_RECORD);
+    setErrors({});
+    setDialogOpen(true);
+  };
+
+  const openEdit = (record) => {
+    setEditing(record);
+    setForm({
+      personName: record.personName || "",
+      amount: record.principal || null,
+      dueDate: record.dueDate || "",
+      description: record.description || ""
+    });
+    setErrors({});
+    setDialogOpen(true);
+  };
+
+  const submitRecord = async () => {
+    const nextErrors = {};
+    if (!form.personName.trim()) nextErrors.personName = "Nama pihak wajib diisi.";
+    if (!form.amount || form.amount <= 0) nextErrors.amount = "Isi jumlah pokok.";
+    if (!form.dueDate) nextErrors.dueDate = "Pilih tanggal jatuh tempo.";
+
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+
+    const payload = {
+      recordType,
+      personName: form.personName.trim(),
+      amount: Number(form.amount),
+      amountInitial: Number(form.amount),
+      dueDate: form.dueDate,
+      description: form.description.trim(),
+      status: "active"
+    };
+
+    setSubmitting(true);
+    const outcome = editing
+      ? await mutations.update("financeRecords", editing.id, payload, {
+          context: isDebt ? "hutang" : "piutang",
+          successMessage: "Data diperbarui."
+        })
+      : await mutations.create("financeRecords", payload, {
+          context: isDebt ? "hutang" : "piutang",
+          successMessage: "Data tersimpan."
         });
-      }
+    setSubmitting(false);
 
-      setAssetKind("goods");
-      setPersonName("");
-      setAmountInitial("");
-      setInstallmentMonths("12");
-      setDueDate("");
-      setRecordAlert({
-        type: "success",
-        title: shouldTrackInitialCashflow
-          ? "Data hutang atau piutang berhasil disimpan dan arus kas awal ikut tercatat."
-          : "Data hutang atau piutang barang berhasil disimpan tanpa menambah arus kas awal."
-      });
-    } catch (error) {
-      setRecordAlert({
-        type: "error",
-        title: error instanceof Error ? error.message : "Gagal menyimpan data hutang atau piutang."
-      });
-    }
+    if (outcome.ok) setDialogOpen(false);
   };
 
-  const handleCreatePayment = async () => {
-    const record = financeRecords.find((item) => item.id === activeRecordId);
-    setPaymentAlert(null);
-    if (!family?.id || !record || !paymentAmount || !paymentDate) {
-      setPaymentAlert({
-        type: "warning",
-        title: "Pilih data hutang/piutang, isi nominal bayar, dan tanggal pembayaran."
-      });
+  const submitPayment = async () => {
+    if (!paymentForm.amount || paymentForm.amount <= 0) {
+      setErrors({ paymentAmount: "Isi nominal pembayaran." });
       return;
     }
 
-    try {
-      const amount = Number(paymentAmount);
-      const nextTotalPaid = Number(record.totalPaid || 0) + amount;
-      const nextRemaining = Math.max(Number(record.amountInitial || 0) - nextTotalPaid, 0);
-      const nextPaymentCount = Number(record.paymentCount || 0) + 1;
-      const nextStatus = nextRemaining <= 0 ? "paid" : "active";
-      const isDebt = record.recordType === "debt";
-      const normalizedAssetKind = normalizeFinanceAssetKind(record.assetKind);
+    setSubmitting(true);
+    const outcome = await mutations.create(
+      "financePayments",
+      {
+        financeRecordId: activeRecord.id,
+        recordType: activeRecord.recordType,
+        personName: activeRecord.personName,
+        amount: Number(paymentForm.amount),
+        paymentDate: paymentForm.date,
+        note: paymentForm.note.trim()
+      },
+      { context: "pembayaran", successMessage: "Pembayaran tercatat." },
+    );
 
-      await createFinancePayment(family.id, {
-        familyId: family.id,
-        financeRecordId: record.id,
-        recordType: record.recordType,
-        assetKind: normalizedAssetKind,
-        userId: user?.uid || "",
-        amount,
-        paymentDate,
-        note: paymentNote.trim(),
-        paymentNumber: nextPaymentCount
-      });
+    // Closing a fully-paid record is a CMS-controlled automation.
+    if (outcome.ok && workflow.automation.autoCloseSettledDebts) {
+      const totalPaid = activeRecord.paid + Number(paymentForm.amount);
+      if (totalPaid >= activeRecord.principal) {
+        await mutations.update(
+          "financeRecords",
+          activeRecord.id,
+          { status: "paid" },
+          { context: "status" },
+        );
+      }
+    }
 
-      await updateFinanceRecord(family.id, record.id, {
-        amountRemaining: nextRemaining,
-        totalPaid: nextTotalPaid,
-        paymentCount: nextPaymentCount,
-        status: nextStatus
-      });
-
-      await createTransaction({
-        familyId: family.id,
-        payload: {
-          familyId: family.id,
-          userId: user?.uid || "",
-          createdBy: user?.uid || "",
-          ownershipType: "shared",
-          type: isDebt ? "expense" : "income",
-          categoryId: isDebt ? "tagihan" : "lainnya_income",
-          accountId: null,
-          amount,
-          date: paymentDate,
-          note: paymentNote.trim() || (isDebt ? `Bayar hutang ke ${record.personName}` : `Pelunasan piutang dari ${record.personName}`),
-          tags: [record.recordType === "debt" ? "pembayaran_hutang" : "pelunasan_piutang"],
-          syncStatus: "synced",
-          title: isDebt ? `Bayar hutang ${record.personName}` : `Pelunasan piutang ${record.personName}`,
-          memberName,
-          categoryName: isDebt ? "Tagihan" : "Lainnya",
-          sourceModule: "finance-record",
-          financeRecordType: record.recordType,
-          financeAssetKind: normalizedAssetKind,
-          relatedFinanceRecordId: record.id
-        }
-      });
-
-      setPaymentAmount("");
-      setPaymentDate(new Date().toISOString().slice(0, 10));
-      setPaymentNote("");
-      setActiveRecordId("");
-      setPaymentAlert({
-        type: "success",
-        title: "Pembayaran berhasil disimpan dan arus kas ikut diperbarui."
-      });
-    } catch (error) {
-      setPaymentAlert({
-        type: "error",
-        title: error instanceof Error ? error.message : "Gagal menyimpan pembayaran."
-      });
+    setSubmitting(false);
+    if (outcome.ok) {
+      setPaymentDialog(false);
+      setPaymentForm(EMPTY_PAYMENT);
     }
   };
+
+  const handleDelete = (record) => {
+    toast.confirm({
+      title: `Hapus catatan ${record.personName}?`,
+      content:
+        record.paymentCount > 0
+          ? `Ada ${record.paymentCount} pembayaran terkait. Riwayat itu akan kehilangan induknya.`
+          : "Catatan ini belum memiliki pembayaran.",
+      okText: "Hapus",
+      danger: true,
+      onOk: () =>
+        mutations.remove("financeRecords", record.id, {
+          context: isDebt ? "hutang" : "piutang",
+          successMessage: "Catatan dihapus."
+        })
+    });
+  };
+
+  const columns = [
+    {
+      title: partyLabel,
+      dataIndex: "personName",
+      render: (value, record) => (
+        <div className="min-w-0">
+          <Typography.Text className="!block !truncate !font-medium !text-ink">
+            {value}
+          </Typography.Text>
+          {record.description ? (
+            <Typography.Text className="!block !truncate !text-caption !text-muted">
+              {record.description}
+            </Typography.Text>
+          ) : null}
+        </div>
+      )
+    },
+    {
+      title: "Pokok",
+      dataIndex: "principal",
+      width: 150,
+      align: "right",
+      sorter: (left, right) => left.principal - right.principal,
+      render: (value) => (
+        <Typography.Text className="!tabular-nums">{formatters.currency(value)}</Typography.Text>
+      )
+    },
+    {
+      title: "Sisa",
+      dataIndex: "remaining",
+      width: 150,
+      align: "right",
+      sorter: (left, right) => left.remaining - right.remaining,
+      render: (value, record) => (
+        <Money value={value} type={record.isSettled ? undefined : isDebt ? "expense" : "income"} />
+      )
+    },
+    {
+      title: "Progress",
+      key: "progress",
+      width: 200,
+      render: (_, record) => (
+        <ProgressMeter
+          value={record.paid}
+          max={record.principal}
+          size="sm"
+          warningAt={101}
+          rightHint={`${record.paymentCount} pembayaran`}
+        />
+      )
+    },
+    {
+      title: "Jatuh tempo",
+      dataIndex: "dueDate",
+      width: 170,
+      render: (value, record) =>
+        value ? (
+          <div>
+            <Typography.Text className="!block !whitespace-nowrap !text-muted">
+              {dayjs(value).format(general.dateFormat)}
+            </Typography.Text>
+            <Badge tone={getStatus(record.status).tone} size="sm">
+              {getStatus(record.status).label}
+            </Badge>
+          </div>
+        ) : (
+          "—"
+        )
+    },
+    {
+      title: "",
+      key: "actions",
+      width: 170,
+      align: "right",
+      render: (_, record) => (
+        <div className="flex justify-end gap-1">
+          {!record.isSettled ? (
+            <Button
+              size="small"
+              type="primary"
+              icon={<DollarOutlined />}
+              onClick={() => {
+                setActiveRecord(record);
+                setPaymentForm(EMPTY_PAYMENT);
+                setErrors({});
+                setPaymentDialog(true);
+              }}
+            >
+              Bayar
+            </Button>
+          ) : null}
+          <Button type="text" size="small" icon={<EditOutlined />} onClick={() => openEdit(record)} />
+          <Button
+            type="text"
+            size="small"
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() => handleDelete(record)}
+          />
+        </div>
+      )
+    }
+  ];
+
+  const renderMobileCard = (record) => (
+    <div className="p-3.5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <Typography.Text className="!block !truncate !font-semibold !text-ink">
+            {record.personName}
+          </Typography.Text>
+          <Typography.Text className="!block !text-caption !text-muted">
+            {record.dueDate ? dayjs(record.dueDate).format(general.dateFormat) : "Tanpa tenggat"}
+          </Typography.Text>
+        </div>
+        <Badge tone={getStatus(record.status).tone}>{getStatus(record.status).label}</Badge>
+      </div>
+
+      <ProgressMeter
+        className="mt-3"
+        value={record.paid}
+        max={record.principal}
+        warningAt={101}
+        leftHint={`Dibayar ${formatters.compact(record.paid)}`}
+        rightHint={`Sisa ${formatters.compact(record.remaining)}`}
+      />
+
+      {!record.isSettled ? (
+        <Button
+          className="!mt-3"
+          size="small"
+          type="primary"
+          block
+          icon={<DollarOutlined />}
+          onClick={() => {
+            setActiveRecord(record);
+            setPaymentForm(EMPTY_PAYMENT);
+            setPaymentDialog(true);
+          }}
+        >
+          Catat pembayaran
+        </Button>
+      ) : null}
+    </div>
+  );
 
   return (
-    <div className="space-y-2.5">
-      <SectionHeading eyebrow="Hutang & Piutang" title="Kelola pokok, cicilan, dan histori pembayaran" />
-
-      <Card className="finance-card finance-soft-card">
-        <Space orientation="vertical" size={10} className="w-full">
-          <Typography.Title level={4} className="!m-0 !text-sm !font-bold">
-            Buat hutang atau piutang baru
-          </Typography.Title>
-          {recordAlert ? (
-            <Alert
-              type={recordAlert.type}
-              showIcon
-              title={recordAlert.title}
-              closable={{ closeIcon: true, onClose: () => setRecordAlert(null), "aria-label": "close" }}
-            />
-          ) : null}
-          <Radio.Group
+    <div className="animate-fade-in">
+      <PageHeader
+        eyebrow="Perencanaan"
+        title="Hutang & piutang"
+        description="Pantau kewajiban dan tagihan beserta riwayat pembayarannya."
+        actions={
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+            Tambah {isDebt ? "hutang" : "piutang"}
+          </Button>
+        }
+        tabs={
+          <Segmented
+            className="ds-segmented-lg"
             value={recordType}
-            onChange={(event) => setRecordType(event.target.value)}
-            optionType="button"
-            buttonStyle="solid"
-            className="finance-type-toggle"
+            onChange={setRecordType}
             options={[
-              { value: "debt", label: "Hutang" },
-              { value: "receivable", label: "Piutang" }
+              { label: `Hutang (${counts.debt})`, value: "debt" },
+              { label: `Piutang (${counts.receivable})`, value: "receivable" }
             ]}
           />
-          <Select
-            value={assetKind}
-            onChange={setAssetKind}
-            size="large"
-            options={[
-              { value: "goods", label: "Barang / kredit barang" },
-              { value: "money", label: "Uang / tunai" }
-            ]}
-          />
-          <Input
-            value={personName}
-            onChange={(event) => setPersonName(event.target.value)}
-            size="large"
-            placeholder={recordType === "debt" ? "Nama pemberi hutang" : "Nama orang yang berhutang"}
-          />
-          <div className="grid grid-cols-2 gap-2">
-            <InputNumber
-              value={amountInitial || null}
-              onChange={(value) => setAmountInitial(String(value || ""))}
-              size="large"
-              className="!w-full"
-              min={0}
-              controls={false}
-              placeholder="Nominal awal"
-            />
-            <DatePicker
-              value={dueDate ? dayjs(dueDate) : null}
-              onChange={(value) => setDueDate(value ? value.format("YYYY-MM-DD") : "")}
-              size="large"
-              className="!w-full"
-              format="DD MMM YYYY"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <Select
-              value={paymentMethod}
-              onChange={setPaymentMethod}
-              size="large"
-              options={[
-                { value: "installment", label: "Cicilan" },
-                { value: "single", label: "Sekali bayar" }
-              ]}
-            />
-            <InputNumber
-              value={installmentMonths || null}
-              onChange={(value) => setInstallmentMonths(String(value || ""))}
-              size="large"
-              className="!w-full"
-              min={1}
-              controls={false}
-              placeholder="Tenor bulan"
-              disabled={paymentMethod === "single"}
-            />
-          </div>
-          <Button type="primary" size="large" onClick={handleCreateRecord} block>
-            Simpan hutang / piutang
-          </Button>
-        </Space>
-      </Card>
+        }
+      />
 
-      <Card className="finance-card finance-soft-card">
-        <Space orientation="vertical" size={10} className="w-full">
-          <Typography.Title level={4} className="!m-0 !text-sm !font-bold">
-            Input pembayaran
-          </Typography.Title>
-          {paymentAlert ? (
-            <Alert
-              type={paymentAlert.type}
-              showIcon
-              title={paymentAlert.title}
-              closable={{ closeIcon: true, onClose: () => setPaymentAlert(null), "aria-label": "close" }}
-            />
-          ) : null}
-          <Select
-            value={activeRecordId || undefined}
-            onChange={setActiveRecordId}
-            size="large"
-            showSearch
-            optionFilterProp="label"
-            placeholder="Pilih data hutang / piutang"
-            options={payableRecordOptions}
-            className="w-full"
-          />
-          <div className="grid grid-cols-2 gap-2">
-            <InputNumber
-              value={paymentAmount || null}
-              onChange={(value) => setPaymentAmount(String(value || ""))}
-              size="large"
-              className="!w-full"
-              min={0}
-              controls={false}
-              placeholder="Nominal bayar"
-            />
-            <DatePicker
-              value={paymentDate ? dayjs(paymentDate) : null}
-              onChange={(value) => setPaymentDate(value ? value.format("YYYY-MM-DD") : "")}
-              size="large"
-              className="!w-full"
-              format="DD MMM YYYY"
-            />
-          </div>
-          <Input.TextArea
-            value={paymentNote}
-            onChange={(event) => setPaymentNote(event.target.value)}
-            autoSize={{ minRows: 3, maxRows: 5 }}
-            placeholder="Contoh: Cicilan bulan ke-3"
-          />
-          <Button type="primary" size="large" onClick={handleCreatePayment} block>
-            Simpan pembayaran
-          </Button>
-        </Space>
-      </Card>
-
-      {!financeRecords.length ? (
-        <EmptyState
-          title="Belum ada hutang atau piutang"
-          description="Buat data hutang atau piutang dulu agar cicilan dan pelunasannya bisa dilacak."
+      {stats.overdue.length > 0 ? (
+        <Alert
+          className="!mb-4"
+          type="error"
+          showIcon
+          title={`${stats.overdue.length} catatan sudah lewat jatuh tempo`}
+          description={stats.overdue.map((item) => item.personName).join(", ")}
         />
       ) : null}
 
-      {financeRecords.length ? (
-        <Card className="finance-card" styles={{ body: { padding: 0, overflow: "hidden" } }}>
-          <Table
-            size="small"
-            tableLayout="fixed"
-            rowKey="id"
-            pagination={{
-              pageSize: 10,
-              size: "small",
-              showSizeChanger: false
-            }}
-            dataSource={financeRecords}
-            onRow={(record) => ({
-              onClick: () => setSelectedRecord(record)
-            })}
-            columns={[
-              {
-                title: "Tipe",
-                dataIndex: "recordType",
-                width: 88,
-                render: (value) => (
-                  <Typography.Text className={`!text-[12px] !font-semibold ${getFinanceTypeTextClass(value)}`}>
-                    {getFinanceTypeLabel(value)}
-                  </Typography.Text>
-                )
-              },
-              {
-                title: "Tgl",
-                dataIndex: "startDate",
-                width: 74,
-                render: (value) => (
-                  <Typography.Text className="!text-[11px] !text-muted">
-                    {formatDate(value, "DD/MM/YY")}
-                  </Typography.Text>
-                )
-              },
-              {
-                title: "Nama",
-                dataIndex: "personName",
-                width: 120,
-                render: (value, item) => (
-                  <div>
-                    <Typography.Text strong className="!block !truncate !text-[13px] !font-semibold">
-                      {truncateText(value, 14)}
-                    </Typography.Text>
-                    <Typography.Text className={`!block !truncate !text-[11px] !font-medium ${getFinanceStatusTextClass(item.status)}`}>
-                      {getFinanceStatusLabel(item.status)}
-                    </Typography.Text>
-                  </div>
-                )
-              },
-              {
-                title: "Total",
-                dataIndex: "amountInitial",
-                width: 108,
-                align: "right",
-                render: (value) => (
-                  <Typography.Text className="!whitespace-nowrap !text-[11px] !font-medium !text-muted">
-                    {formatCurrency(value)}
-                  </Typography.Text>
-                )
-              },
-              {
-                title: "Sisa",
-                dataIndex: "amountRemaining",
-                width: 108,
-                align: "right",
-                render: (value) => (
-                  <Typography.Text className="!whitespace-nowrap !text-[11px] !font-semibold !text-expense">
-                    {formatCurrency(value)}
-                  </Typography.Text>
-                )
-              }
-            ]}
-          />
-        </Card>
-      ) : null}
+      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard label="Aktif" value={stats.activeCount} loading={loading} />
+        <StatCard
+          label="Total pokok"
+          value={formatters.compact(stats.principal)}
+          tone={isDebt ? "danger" : "success"}
+          loading={loading}
+        />
+        <StatCard
+          label="Sudah dibayar"
+          value={formatters.compact(stats.paid)}
+          tone="success"
+          loading={loading}
+        />
+        <StatCard
+          label="Sisa"
+          value={formatters.compact(stats.remaining)}
+          tone={stats.remaining > 0 ? "warning" : "success"}
+          loading={loading}
+        />
+      </div>
 
-      <FinanceDetailModal
-        record={selectedRecord}
-        payments={financePayments.filter((item) => item.financeRecordId === selectedRecord?.id)}
-        onClose={() => setSelectedRecord(null)}
+      <DataTable
+        dataSource={rows}
+        columns={columns}
+        renderMobileCard={renderMobileCard}
+        loading={loading}
+        scrollX={1000}
+        emptyState={
+          <EmptyState
+            title={`Belum ada ${isDebt ? "hutang" : "piutang"}`}
+            description={
+              isDebt
+                ? "Catat pinjaman yang harus dibayar agar jatuh temponya tidak terlewat."
+                : "Catat uang yang dipinjam orang lain supaya mudah ditagih."
+            }
+            action={
+              <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+                Tambah {isDebt ? "hutang" : "piutang"}
+              </Button>
+            }
+          />
+        }
       />
+
+      <ResponsiveDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        onSubmit={submitRecord}
+        submitting={submitting}
+        title={`${editing ? "Ubah" : "Tambah"} ${isDebt ? "hutang" : "piutang"}`}
+      >
+        <Field label={partyLabel} required error={errors.personName}>
+          <Input
+            size="large"
+            value={form.personName}
+            onChange={(event) => setForm({ ...form, personName: event.target.value })}
+            placeholder="Nama orang atau institusi"
+            status={errors.personName ? "error" : undefined}
+            autoFocus
+          />
+        </Field>
+
+        <Field label="Jumlah pokok" required error={errors.amount}>
+          <MoneyField
+            value={form.amount}
+            onChange={(value) => setForm({ ...form, amount: value })}
+            currencySymbol={general.currencySymbol}
+            locale={general.locale}
+            status={errors.amount ? "error" : undefined}
+          />
+        </Field>
+
+        <Field label="Jatuh tempo" required error={errors.dueDate}>
+          <DatePicker
+            size="large"
+            className="!w-full"
+            format={general.dateFormat}
+            value={form.dueDate ? dayjs(form.dueDate) : null}
+            onChange={(value) =>
+              setForm({ ...form, dueDate: value ? value.format("YYYY-MM-DD") : "" })
+            }
+            status={errors.dueDate ? "error" : undefined}
+          />
+        </Field>
+
+        <Field label="Keterangan" optional>
+          <Input.TextArea
+            value={form.description}
+            onChange={(event) => setForm({ ...form, description: event.target.value })}
+            placeholder="Contoh: pinjaman modal usaha"
+            autoSize={{ minRows: 2, maxRows: 4 }}
+          />
+        </Field>
+      </ResponsiveDialog>
+
+      <ResponsiveDialog
+        open={paymentDialog}
+        onClose={() => setPaymentDialog(false)}
+        onSubmit={submitPayment}
+        submitting={submitting}
+        title="Catat pembayaran"
+        description={
+          activeRecord
+            ? `${activeRecord.personName} — sisa ${formatters.currency(activeRecord.remaining)} dari ${formatters.currency(activeRecord.principal)}.`
+            : null
+        }
+      >
+        <Field label="Nominal pembayaran" required error={errors.paymentAmount}>
+          <MoneyField
+            value={paymentForm.amount}
+            onChange={(value) => setPaymentForm({ ...paymentForm, amount: value })}
+            currencySymbol={general.currencySymbol}
+            locale={general.locale}
+            quickAmounts={activeRecord ? [activeRecord.remaining] : []}
+            status={errors.paymentAmount ? "error" : undefined}
+            autoFocus
+          />
+        </Field>
+
+        <Field label="Tanggal" required>
+          <DatePicker
+            size="large"
+            className="!w-full"
+            format={general.dateFormat}
+            allowClear={false}
+            value={paymentForm.date ? dayjs(paymentForm.date) : null}
+            onChange={(value) =>
+              setPaymentForm({ ...paymentForm, date: value ? value.format("YYYY-MM-DD") : "" })
+            }
+          />
+        </Field>
+
+        <Field label="Catatan" optional>
+          <Input
+            size="large"
+            value={paymentForm.note}
+            onChange={(event) => setPaymentForm({ ...paymentForm, note: event.target.value })}
+            placeholder="Contoh: transfer bank"
+          />
+        </Field>
+      </ResponsiveDialog>
     </div>
   );
-}
-
-function FinanceDetailModal({ record, payments, onClose }) {
-  const open = Boolean(record);
-  const paidPercent = record
-    ? Math.min((Number(record.totalPaid || 0) / Number(record.amountInitial || 1)) * 100, 100)
-    : 0;
-
-  if (!record) return null;
-
-  const summaryItems = [
-    {
-      label: "Sisa",
-      value: formatCurrency(record.amountRemaining),
-      highlight: true,
-    },
-    {
-      label: "Terbayar",
-      value: formatCurrency(record.totalPaid || 0),
-    },
-    {
-      label: "Cicilan",
-      value: `${record.paymentCount || 0}/${record.installmentMonths || 1} kali`,
-    },
-    {
-      label: "Awal",
-      value: formatCurrency(record.amountInitial),
-    },
-    {
-      label: "Bentuk",
-      value: getFinanceAssetKindLabel(record.assetKind),
-    },
-    {
-      label: "Due",
-      value: formatDate(record.dueDate),
-    },
-  ];
-
-  return (
-    <Modal
-      open={open}
-      onCancel={onClose}
-      footer={null}
-      title={null}
-      centered
-      width={390}
-      styles={{
-        content: {
-          background: themePalette.colors.panel,
-          padding: 14,
-          borderRadius: 18,
-        },
-        body: { padding: 0 },
-      }}
-    >
-      <div className="space-y-3">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <Typography.Title level={5} className="!mb-0 truncate !text-[15px]">
-              {record.personName}
-            </Typography.Title>
-
-            <Typography.Text className="mt-0.5 block !text-[11px] !text-muted">
-              {record.recordType === "debt" ? "Hutang" : "Piutang"} · Jatuh tempo {formatDate(record.dueDate)}
-            </Typography.Text>
-          </div>
-
-          <Tag
-            className={`shrink-0 rounded-full border-0 px-2.5 py-0.5 text-[11px] font-semibold ${getFinanceStatusTagClass(
-              record.status,
-            )}`}
-          >
-            {getFinanceStatusLabel(record.status)}
-          </Tag>
-        </div>
-
-        {/* Summary */}
-        <div className="grid grid-cols-2 gap-x-3 gap-y-2 rounded-2xl border border-line bg-panel/60 p-3">
-          {summaryItems.map((item) => (
-            <div
-              key={item.label}
-              className={`min-w-0 rounded-xl px-2 py-1.5 ${
-                item.highlight
-                  ? "bg-red-500/10" // bisa disesuaikan dengan theme
-                  : ""
-              }`}
-            >
-              <Typography.Text className="block !text-[10px] uppercase tracking-[0.08em] !text-muted">
-                {item.label}
-              </Typography.Text>
-
-              <Typography.Text
-                className={`block truncate !text-[12px] ${
-                  item.highlight ? "font-semibold text-red-500" : ""
-                }`}
-              >
-                {item.value}
-              </Typography.Text>
-            </div>
-          ))}
-        </div>
-
-        {/* Progress */}
-        <div className="rounded-2xl border border-line bg-panel/60 p-3">
-          <div className="mb-1.5 flex items-center justify-between gap-3">
-            <Typography.Text className="!text-[11px] !text-muted">
-              Progress pembayaran
-            </Typography.Text>
-            <Typography.Text className="!text-[11px] font-semibold">
-              {Math.round(paidPercent)}%
-            </Typography.Text>
-          </div>
-
-          <Progress
-            percent={Math.round(paidPercent)}
-            showInfo={false}
-            size="small"
-            strokeColor={themePalette.colors.primaryStrong}
-            railColor={themePalette.colors.progressRail}
-          />
-
-          <Typography.Text className="mt-1.5 block !text-[11px] !text-muted">
-            {formatCurrency(record.totalPaid || 0)} / {formatCurrency(record.amountInitial || 0)}
-          </Typography.Text>
-        </div>
-
-        {/* Payment History */}
-        <div>
-          <div className="mb-2 flex items-center justify-between">
-            <Typography.Text className="!text-[11px] font-semibold uppercase tracking-[0.12em] !text-muted">
-              Riwayat
-            </Typography.Text>
-            <Typography.Text className="!text-[11px] !text-muted">
-              {payments.length} pembayaran
-            </Typography.Text>
-          </div>
-
-          <div className="max-h-[210px] overflow-y-auto rounded-2xl border border-line">
-            {payments.length ? (
-              payments.map((payment, index) => (
-                <div
-                  key={payment.id}
-                  className={`bg-panel px-3 py-2 ${
-                    index === payments.length - 1 ? "" : "border-b border-line"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <Typography.Text className="block truncate !text-[12px] font-semibold">
-                        {formatCurrency(payment.amount)}
-                      </Typography.Text>
-                      <Typography.Text className="block truncate !text-[11px] !text-muted">
-                        #{payment.paymentNumber || "-"} · {payment.note || "Tanpa catatan"}
-                      </Typography.Text>
-                    </div>
-
-                    <Typography.Text className="shrink-0 !text-[11px] !text-muted">
-                      {formatDate(payment.paymentDate)}
-                    </Typography.Text>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="p-3">
-                <Alert
-                  type="info"
-                  showIcon
-                  message="Belum ada pembayaran."
-                  className="!py-2"
-                />
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
-function DetailInfo({ label, value }) {
-  return (
-    <Card size="small" className="finance-soft-card">
-      <Typography.Text className="metric-label">{label}</Typography.Text>
-      <Typography.Text className="mt-1.5 block text-[13px] font-semibold text-ink">{value}</Typography.Text>
-    </Card>
-  );
-}
-
-function truncateText(value, maxLength) {
-  if (!value) return "-";
-  return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
-}
-
-function getFinanceStatusLabel(status) {
-  switch (status) {
-    case "paid":
-      return "Lunas";
-    case "overdue":
-      return "Terlambat";
-    default:
-      return "Aktif";
-  }
-}
-
-function getFinanceStatusTagClass(status) {
-  switch (status) {
-    case "paid":
-      return "bg-income/15 text-income";
-    case "overdue":
-      return "bg-warning/15 text-warning";
-    default:
-      return "bg-primary/15 text-primary";
-  }
-}
-
-function getFinanceStatusTextClass(status) {
-  switch (status) {
-    case "paid":
-      return "!text-income";
-    case "overdue":
-      return "!text-warning";
-    default:
-      return "!text-primary";
-  }
-}
-
-function getFinanceTypeTextClass(recordType) {
-  switch (recordType) {
-    case "debt":
-      return "!text-expense";
-    default:
-      return "!text-income";
-  }
-}
-
-function getFinanceTypeLabel(recordType) {
-  return recordType === "debt" ? "Hutang" : "Piutang";
-}
-
-function normalizeFinanceAssetKind(assetKind) {
-  const normalizedValue = String(assetKind || "").trim().toLowerCase();
-
-  if (["goods", "barang", "item", "product", "produk"].includes(normalizedValue)) {
-    return "goods";
-  }
-
-  if (["money", "uang", "duit", "cash", "tunai"].includes(normalizedValue)) {
-    return "money";
-  }
-
-  return "unknown";
-}
-
-function getFinanceAssetKindLabel(assetKind) {
-  switch (normalizeFinanceAssetKind(assetKind)) {
-    case "goods":
-      return "Barang";
-    case "money":
-      return "Uang";
-    default:
-      return "Belum dipilih";
-  }
 }

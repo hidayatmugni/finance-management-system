@@ -1,146 +1,131 @@
 import { LockOutlined, MailOutlined } from "@ant-design/icons";
-import { Alert, Button, Card, Input, Space, Typography } from "antd";
-import { useEffect, useState } from "react";
+import { Alert, Button, Input, Typography } from "antd";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useConfigSection } from "../../shared/config/useAppConfig";
+import { renderIcon } from "../../shared/config/iconRegistry";
+import { Card, Field } from "../../shared/ui";
+import { ThemeSwitcher } from "../../shared/ui/ThemeSwitcher";
 import { useAuth } from "./AuthProvider";
-import { Controller, useForm } from "react-hook-form";
 
+/** Sign-in screen. Accounts are provisioned in Firebase, so there is no signup. */
 export function AuthPage() {
   const navigate = useNavigate();
   const { login, isFirebaseReady } = useAuth();
-  const [submitAlert, setSubmitAlert] = useState(null);
+  const general = useConfigSection("general");
 
-  useEffect(() => {
-    if (!submitAlert) return undefined;
-    const timeoutId = window.setTimeout(() => setSubmitAlert(null), 2000);
-    return () => window.clearTimeout(timeoutId);
-  }, [submitAlert]);
+  const [values, setValues] = useState({ email: "", password: "" });
+  const [errors, setErrors] = useState({});
+  const [submitError, setSubmitError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const {
-    control,
-    handleSubmit,
-    formState: { errors, isSubmitting }
-  } = useForm({
-    defaultValues: {
-      email: "",
-      password: ""
+  const validate = (candidate) => {
+    const nextErrors = {};
+    const email = candidate.email.trim().toLowerCase();
+
+    if (!email) nextErrors.email = "Email wajib diisi.";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) nextErrors.email = "Format email tidak valid.";
+
+    if (!candidate.password) nextErrors.password = "Kata sandi wajib diisi.";
+    return nextErrors;
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setSubmitError(null);
+
+    const nextErrors = validate(values);
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+
+    if (!isFirebaseReady) {
+      setSubmitError("Konfigurasi Firebase belum lengkap. Periksa variabel lingkungan aplikasi.");
+      return;
     }
-  });
 
-  const onSubmit = async (values) => {
-    setSubmitAlert(null);
-
+    setSubmitting(true);
     try {
-      if (!isFirebaseReady) throw new Error("Konfigurasi Firebase di frontend belum lengkap.");
-      const normalizedEmail = values.email?.trim().toLowerCase();
-      if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-        throw new Error("Format email tidak valid.");
-      }
-
-      await login({
-        email: normalizedEmail,
-        password: values.password
-      });
-
+      await login({ email: values.email.trim().toLowerCase(), password: values.password });
       navigate("/dashboard", { replace: true });
     } catch (error) {
-      setSubmitAlert({
-        type: "error",
-        title: error instanceof Error ? error.message : "Autentikasi gagal."
-      });
+      setSubmitError(error instanceof Error ? error.message : "Autentikasi gagal.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-md items-center px-4">
-      <Card className="finance-card finance-soft-card w-full" styles={{ body: { padding: 24 } }}>
-        <Space orientation="vertical" size={6} className="w-full">
-          <Typography.Text className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
-            Autentikasi
-          </Typography.Text>
-          <Typography.Title level={2} className="!m-0 !text-[1.8rem] !font-extrabold">
-            Akses keluarga
+    <div className="flex min-h-screen items-center justify-center px-4 py-10">
+      <div className="w-full max-w-sm">
+        <div className="mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-10 w-10 items-center justify-center rounded-md bg-primary text-primary-fg">
+              {renderIcon("wallet")}
+            </span>
+            <div className="min-w-0">
+              <Typography.Text className="!block !truncate !font-display !text-body-lg !font-bold !text-ink">
+                {general.appName}
+              </Typography.Text>
+              <Typography.Text className="!block !truncate !text-caption !text-muted">
+                {general.tagline}
+              </Typography.Text>
+            </div>
+          </div>
+          <ThemeSwitcher />
+        </div>
+
+        <Card className="p-5 md:p-6">
+          <Typography.Title level={1} className="!mb-1 !text-title !font-bold !text-ink">
+            Masuk
           </Typography.Title>
-          <Typography.Paragraph className="!m-0 !text-sm !leading-6 !text-muted">
-            Semua halaman aplikasi dilindungi login. Akun dibuat langsung dari Firebase, jadi halaman ini hanya dipakai untuk masuk ke aplikasi.
-          </Typography.Paragraph>
-        </Space>
-
-        <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4">
-          <label className="block">
-            <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-muted">
-              Email
-            </span>
-            <Controller
-              name="email"
-              control={control}
-              rules={{
-                required: "Email wajib diisi.",
-                pattern: {
-                  value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-                  message: "Format email tidak valid."
-                }
-              }}
-              render={({ field }) => (
-                <Input
-                  {...field}
-                  prefix={<MailOutlined className="text-muted" />}
-                  type="email"
-                  autoComplete="email"
-                  size="large"
-                  placeholder="anda@email.com"
-                  status={errors.email ? "error" : ""}
-                />
-              )}
-            />
-            {errors.email ? <span className="mt-2 block text-xs text-expense">{errors.email.message}</span> : null}
-          </label>
-
-          <label className="block">
-            <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-muted">
-              Kata sandi
-            </span>
-            <Controller
-              name="password"
-              control={control}
-              rules={{ required: "Kata sandi wajib diisi." }}
-              render={({ field }) => (
-                <Input.Password
-                  {...field}
-                  prefix={<LockOutlined className="text-muted" />}
-                  autoComplete="current-password"
-                  size="large"
-                  placeholder="Minimal 6 karakter"
-                  status={errors.password ? "error" : ""}
-                />
-              )}
-            />
-            {errors.password ? <span className="mt-2 block text-xs text-expense">{errors.password.message}</span> : null}
-          </label>
-
-          {submitAlert ? (
-            <Alert
-              type={submitAlert.type}
-              showIcon
-              title={submitAlert.title}
-              closable={{ closeIcon: true, onClose: () => setSubmitAlert(null), "aria-label": "close" }}
-            />
-          ) : null}
-
-          <Button type="primary" htmlType="submit" loading={isSubmitting} size="large" block>
-            Masuk ke aplikasi
-          </Button>
-        </form>
-
-        <Card size="small" className="finance-soft-card !mt-5">
-          <Typography.Text className="!text-xs !leading-6 !text-muted">
-            Status login:
-            <span className="ml-1 font-semibold text-ink">
-              {isFirebaseReady ? "Firebase siap" : "Konfigurasi belum lengkap"}
-            </span>
+          <Typography.Text className="!mb-5 !block !text-body !text-muted">
+            Gunakan akun yang sudah terdaftar untuk melanjutkan.
           </Typography.Text>
+
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+            <Field label="Email" required error={errors.email}>
+              <Input
+                size="large"
+                type="email"
+                autoComplete="email"
+                autoFocus
+                value={values.email}
+                onChange={(event) => setValues({ ...values, email: event.target.value })}
+                prefix={<MailOutlined className="text-subtle" />}
+                placeholder="nama@email.com"
+                status={errors.email ? "error" : undefined}
+              />
+            </Field>
+
+            <Field label="Kata sandi" required error={errors.password}>
+              <Input.Password
+                size="large"
+                autoComplete="current-password"
+                value={values.password}
+                onChange={(event) => setValues({ ...values, password: event.target.value })}
+                prefix={<LockOutlined className="text-subtle" />}
+                placeholder="Minimal 6 karakter"
+                status={errors.password ? "error" : undefined}
+              />
+            </Field>
+
+            {submitError ? (
+              <Alert type="error" showIcon title={submitError} closable />
+            ) : null}
+
+            <Button type="primary" htmlType="submit" size="large" block loading={submitting}>
+              Masuk ke aplikasi
+            </Button>
+          </form>
         </Card>
-      </Card>
+
+        <Typography.Text className="!mt-4 !block !text-center !text-caption !text-muted">
+          Status Firebase:{" "}
+          <span className={isFirebaseReady ? "text-success-ink" : "text-danger-ink"}>
+            {isFirebaseReady ? "siap" : "konfigurasi belum lengkap"}
+          </span>
+        </Typography.Text>
+      </div>
     </div>
   );
 }

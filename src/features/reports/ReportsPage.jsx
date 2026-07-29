@@ -1,640 +1,411 @@
-import { useMemo, useState } from "react";
+import { FileExcelOutlined } from "@ant-design/icons";
+import { Button, DatePicker, Segmented, Tabs, Typography } from "antd";
 import dayjs from "dayjs";
-import { Button, Card, DatePicker, Modal, Select, Space, Tag, Typography } from "antd";
-import { Link } from "react-router-dom";
-import {
-  Cell,
-  Legend,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  CartesianGrid,
-  XAxis,
-  YAxis,
-  Line,
-  LineChart
-} from "recharts";
+import { useMemo, useState } from "react";
+import { useConfigSection, useFormatters, usePermissions } from "../../shared/config/useAppConfig";
+import { useCatalogue } from "../../shared/data/useCatalogue";
+import { useTheme } from "../../shared/design/ThemeProvider";
 import { useFinanceStore } from "../../shared/state/useFinanceStore";
-import { EmptyState } from "../../shared/components/EmptyState";
-import { SectionHeading } from "../../shared/components/SectionHeading";
-import { MetricCard } from "../../shared/components/MetricCard";
-import {
-  buildCategoryBreakdown,
-  buildFinanceSummary,
-  buildUserInputSummary
-} from "../../shared/utils/finance";
-import { exportLaporanTahunanExcel } from "../../shared/utils/excelExport";
-import {
-  formatCompactCurrency,
-  formatCurrency,
-  formatDate
-} from "../../shared/utils/format";
-import { getBookMonthFromDate, getBookMonthRange, inDateRange, isInBookYear } from "../../shared/utils/dateFilters";
-import { themePalette } from "../../shared/config/themePalette";
 import { useAuth } from "../auth/AuthProvider";
-// import { openDailyInvoicePrint } from "../../shared/utils/dailyInvoice";
+import {
+  Badge,
+  DataTable,
+  DonutChart,
+  EmptyState,
+  Field,
+  Money,
+  PageHeader,
+  ProgressMeter,
+  RankedBarList,
+  SectionCard,
+  StatCard,
+  TrendChart,
+  MultiSelect,
+  useToast
+} from "../../shared/ui";
+import { buildRangePresets, getCurrentBookMonthRange } from "../../shared/utils/dateFilters";
+import {
+  buildBudgetUsage,
+  buildCategoryBreakdown,
+  buildDailySeries,
+  buildMemberBreakdown,
+  buildMonthlySeries,
+  buildSummary,
+  filterByRange
+} from "../../shared/utils/finance";
 
-const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+const { RangePicker } = DatePicker;
 
+/** Analytical views over the ledger, plus the Excel export. */
 export function ReportsPage() {
-  const currentBookMonth = getBookMonthFromDate();
-  const family = useFinanceStore((state) => state.family);
-  const members = useFinanceStore((state) => state.members);
+  const toast = useToast();
+  const formatters = useFormatters();
+  const catalogue = useCatalogue();
+  const { colors } = useTheme();
+  const { profile } = useAuth();
+  const { can } = usePermissions(profile?.role);
+
+  const general = useConfigSection("general");
+  const notifications = useConfigSection("notifications");
+
   const transactions = useFinanceStore((state) => state.transactions);
-  const savingContributions = useFinanceStore((state) => state.savingContributions);
-  const financePayments = useFinanceStore((state) => state.financePayments);
-  const financeRecords = useFinanceStore((state) => state.financeRecords);
-  const { user } = useAuth();
-  const [selectedYear, setSelectedYear] = useState(String(currentBookMonth.year));
-  const [activeMemberId, setActiveMemberId] = useState("all");
-  const [selectedMonth, setSelectedMonth] = useState(null);
+  const budgets = useFinanceStore((state) => state.budgets);
+  const members = useFinanceStore((state) => state.members);
+  const family = useFinanceStore((state) => state.family);
+  const loading = useFinanceStore((state) => state.loading.transactions);
 
-  const financeRecordMap = useMemo(
-    () => Object.fromEntries(financeRecords.map((item) => [item.id, item])),
-    [financeRecords],
+  const defaultRange = useMemo(() => {
+    const period = getCurrentBookMonthRange(general);
+    return [dayjs(period.startDate), dayjs(period.endDate)];
+  }, [general]);
+
+  const [range, setRange] = useState(defaultRange);
+  const [type, setType] = useState("all");
+  const [categoryIds, setCategoryIds] = useState([]);
+  const [exporting, setExporting] = useState(false);
+
+  const filtered = useMemo(() => {
+    const [start, end] = range;
+    return filterByRange(transactions, start?.format("YYYY-MM-DD"), end?.format("YYYY-MM-DD"))
+      .filter((item) => type === "all" || item.type === type)
+      .filter((item) => categoryIds.length === 0 || categoryIds.includes(item.categoryId));
+  }, [transactions, range, type, categoryIds]);
+
+  const summary = useMemo(() => buildSummary(filtered), [filtered]);
+
+  const dailySeries = useMemo(
+    () => buildDailySeries(filtered, range[0]?.format("YYYY-MM-DD"), range[1]?.format("YYYY-MM-DD")),
+    [filtered, range],
   );
 
-  const yearTransactions = useMemo(
-    () => filterByYearAndUser(transactions, "date", Number(selectedYear), activeMemberId),
-    [activeMemberId, selectedYear, transactions],
+  const monthlySeries = useMemo(
+    () => buildMonthlySeries(transactions, range[1]?.year() || dayjs().year(), general),
+    [transactions, range, general],
   );
 
-  const yearSavingContributions = useMemo(
-    () => filterByYearAndUser(savingContributions, "date", Number(selectedYear), activeMemberId),
-    [activeMemberId, savingContributions, selectedYear],
+  const expenseByCategory = useMemo(
+    () => buildCategoryBreakdown(filtered, catalogue.categories, "expense"),
+    [filtered, catalogue.categories],
   );
 
-  const yearFinancePayments = useMemo(
-    () => filterByYearAndUser(financePayments, "paymentDate", Number(selectedYear), activeMemberId),
-    [activeMemberId, financePayments, selectedYear],
+  const incomeByCategory = useMemo(
+    () => buildCategoryBreakdown(filtered, catalogue.categories, "income"),
+    [filtered, catalogue.categories],
   );
 
-  const summary = buildFinanceSummary(yearTransactions, {
-    year: Number(selectedYear),
-    month: null
-  });
-
-  const categories = buildCategoryBreakdown(yearTransactions);
-  const users = buildUserInputSummary(yearTransactions);
-
-  const monthlyDataset = useMemo(
-    () =>
-      buildMonthlyReportDataset({
-        year: Number(selectedYear),
-        transactions: yearTransactions,
-        savingContributions: yearSavingContributions,
-        financePayments: yearFinancePayments,
-        financeRecordMap
-      }),
-    [financeRecordMap, selectedYear, yearFinancePayments, yearSavingContributions, yearTransactions],
+  const memberBreakdown = useMemo(
+    () => buildMemberBreakdown(filtered, members),
+    [filtered, members],
   );
 
-  const yearTotals = useMemo(
-    () => ({
-      totalSavings: yearSavingContributions.reduce((total, item) => total + Number(item.amount || 0), 0),
-      totalDebtPaid: yearFinancePayments
-        .filter((item) => financeRecordMap[item.financeRecordId]?.recordType === "debt")
-        .reduce((total, item) => total + Number(item.amount || 0), 0),
-      totalReceivableCollected: yearFinancePayments
-        .filter((item) => financeRecordMap[item.financeRecordId]?.recordType === "receivable")
-        .reduce((total, item) => total + Number(item.amount || 0), 0)
-    }),
-    [financeRecordMap, yearFinancePayments, yearSavingContributions],
-  );
-  const categoryComposition = useMemo(
-    () => buildCategoryComposition(categories),
-    [categories],
+  const budgetPerformance = useMemo(
+    () => buildBudgetUsage(budgets, filtered, catalogue.categories, notifications.budgetAlertThreshold),
+    [budgets, filtered, catalogue.categories, notifications.budgetAlertThreshold],
   );
 
-  const selectedMonthDetail = useMemo(
-    () => monthlyDataset.find((item) => item.monthIndex === selectedMonth) || null,
-    [monthlyDataset, selectedMonth],
-  );
+  /**
+   * The Excel writer is heavy (ExcelJS), so it is imported only when the user
+   * actually exports — it never lands in the initial bundle.
+   */
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const { exportLaporanTahunanExcel } = await import("../../shared/utils/excelExport");
+      await exportLaporanTahunanExcel({
+        year: range[1]?.year() || dayjs().year(),
+        transactions: filtered,
+        familyName: family?.name || general.appName
+      });
+      toast.success("Laporan Excel berhasil dibuat.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal membuat file Excel.");
+    } finally {
+      setExporting(false);
+    }
+  };
 
-  const invoiceMemberId = activeMemberId === "all" ? user?.uid || "" : activeMemberId;
-  const invoiceMember = members.find((member) => member.id === invoiceMemberId);
-  // const dailyInvoiceTransactions = useMemo(() => {
-  //   const today = dayjs().format("YYYY-MM-DD");
+  const tabs = [
+    {
+      key: "trend",
+      label: "Tren",
+      children: (
+        <div className="grid gap-4 xl:grid-cols-2">
+          <SectionCard title="Arus kas harian" description="Rentang terpilih">
+            <TrendChart
+              data={dailySeries}
+              series={[
+                { key: "income", label: "Masuk", color: colors.income },
+                { key: "expense", label: "Keluar", color: colors.expense }
+              ]}
+              valueFormatter={formatters.currency}
+              axisFormatter={formatters.compact}
+            />
+          </SectionCard>
 
-  //   return transactions.filter((item) => {
-  //     const sameDay = item.date === today;
-  //     const sameUser = invoiceMemberId ? item.userId === invoiceMemberId : false;
-  //     return sameDay && sameUser;
-  //   });
-  // }, [invoiceMemberId, transactions]);
+          <SectionCard title="Saldo kumulatif" description="Akumulasi arus kas bersih">
+            <TrendChart
+              variant="line"
+              data={dailySeries}
+              series={[{ key: "cumulative", label: "Saldo", color: colors.primary }]}
+              valueFormatter={formatters.currency}
+              axisFormatter={formatters.compact}
+              showLegend={false}
+            />
+          </SectionCard>
 
-  // const handleOpenDailyInvoice = () => {
-  //   const expenses = dailyInvoiceTransactions
-  //     .filter((item) => item.type === "expense")
-  //     .map((item) => mapTransactionToInvoiceRow(item));
-  //   const incomes = dailyInvoiceTransactions
-  //     .filter((item) => item.type === "income")
-  //     .map((item) => mapTransactionToInvoiceRow(item));
+          <SectionCard
+            title="Perbandingan bulanan"
+            description={`Tahun ${range[1]?.year() || dayjs().year()}`}
+            className="xl:col-span-2"
+          >
+            <TrendChart
+              variant="bar"
+              data={monthlySeries}
+              series={[
+                { key: "income", label: "Masuk", color: colors.income },
+                { key: "expense", label: "Keluar", color: colors.expense }
+              ]}
+              valueFormatter={formatters.currency}
+              axisFormatter={formatters.compact}
+            />
+          </SectionCard>
+        </div>
+      )
+    },
+    {
+      key: "category",
+      label: "Kategori",
+      children: (
+        <div className="grid gap-4 xl:grid-cols-2">
+          <SectionCard title="Pengeluaran per kategori">
+            {expenseByCategory.length === 0 ? (
+              <EmptyState compact title="Tidak ada pengeluaran" description={null} />
+            ) : (
+              <>
+                <DonutChart
+                  data={expenseByCategory.slice(0, 7)}
+                  valueFormatter={formatters.currency}
+                  centerLabel="Total"
+                  centerValue={formatters.compact(summary.expense)}
+                />
+                <div className="mt-4">
+                  <RankedBarList
+                    items={expenseByCategory}
+                    valueFormatter={formatters.compact}
+                    max={8}
+                  />
+                </div>
+              </>
+            )}
+          </SectionCard>
 
-  //   openDailyInvoicePrint({
-  //     familyName: family?.name || "My Finance",
-  //     memberName: invoiceMember?.fullName || invoiceMember?.name || user?.displayName || user?.email || "User",
-  //     dateLabel: dayjs().format("dddd, DD MMMM YYYY"),
-  //     expenses,
-  //     incomes
-  //   });
-  // };
-
-  if (!transactions.length) {
-    return (
-      <div className="space-y-4">
-        <SectionHeading eyebrow="Laporan" title="Ringkasan dan detail bulanan" />
-        <EmptyState
-          title="Belum ada laporan"
-          description="Laporan akan muncul setelah transaksi mulai tercatat."
+          <SectionCard title="Pemasukan per kategori">
+            {incomeByCategory.length === 0 ? (
+              <EmptyState compact title="Tidak ada pemasukan" description={null} />
+            ) : (
+              <>
+                <DonutChart
+                  data={incomeByCategory.slice(0, 7)}
+                  valueFormatter={formatters.currency}
+                  centerLabel="Total"
+                  centerValue={formatters.compact(summary.income)}
+                />
+                <div className="mt-4">
+                  <RankedBarList
+                    items={incomeByCategory}
+                    valueFormatter={formatters.compact}
+                    max={8}
+                  />
+                </div>
+              </>
+            )}
+          </SectionCard>
+        </div>
+      )
+    },
+    {
+      key: "budget",
+      label: "Anggaran",
+      children: (
+        <DataTable
+          dataSource={budgetPerformance}
+          showPagination={false}
+          scrollX={760}
+          columns={[
+            { title: "Kategori", dataIndex: "categoryName" },
+            {
+              title: "Limit",
+              dataIndex: "limit",
+              width: 150,
+              align: "right",
+              render: (value) => formatters.currency(value)
+            },
+            {
+              title: "Terpakai",
+              dataIndex: "spent",
+              width: 150,
+              align: "right",
+              render: (value) => formatters.currency(value)
+            },
+            {
+              title: "Selisih",
+              dataIndex: "remaining",
+              width: 150,
+              align: "right",
+              render: (value) => (
+                <Money value={Math.abs(value)} type={value >= 0 ? "income" : "expense"} />
+              )
+            },
+            {
+              title: "Progress",
+              key: "progress",
+              width: 220,
+              render: (_, record) => (
+                <ProgressMeter
+                  value={record.spent}
+                  max={record.limit}
+                  size="sm"
+                  warningAt={notifications.budgetAlertThreshold}
+                />
+              )
+            }
+          ]}
+          emptyState={
+            <EmptyState
+              title="Belum ada anggaran"
+              description="Buat anggaran per kategori untuk melihat performanya di sini."
+            />
+          }
         />
-      </div>
-    );
-  }
+      )
+    },
+    {
+      key: "member",
+      label: "Anggota",
+      children: (
+        <DataTable
+          dataSource={memberBreakdown}
+          rowKey="id"
+          showPagination={false}
+          scrollX={640}
+          columns={[
+            { title: "Anggota", dataIndex: "name" },
+            {
+              title: "Transaksi",
+              dataIndex: "count",
+              width: 130,
+              align: "right",
+              sorter: (left, right) => left.count - right.count
+            },
+            {
+              title: "Pemasukan",
+              dataIndex: "income",
+              width: 170,
+              align: "right",
+              render: (value) => <Money value={value} type="income" />
+            },
+            {
+              title: "Pengeluaran",
+              dataIndex: "expense",
+              width: 170,
+              align: "right",
+              sorter: (left, right) => left.expense - right.expense,
+              render: (value) => <Money value={value} type="expense" />
+            }
+          ]}
+          emptyState={<EmptyState title="Belum ada data anggota" description={null} />}
+        />
+      )
+    }
+  ];
 
   return (
-    <div className="space-y-3">
-      <SectionHeading eyebrow="Laporan" title="Ringkasan dan detail bulanan" />
+    <div className="animate-fade-in">
+      <PageHeader
+        eyebrow="Analisa"
+        title="Laporan"
+        description="Pilih rentang, lalu telusuri tren, kategori, anggaran dan kontribusi anggota."
+        actions={
+          can("report.export") ? (
+            <Button icon={<FileExcelOutlined />} loading={exporting} onClick={handleExport}>
+              Export Excel
+            </Button>
+          ) : null
+        }
+      />
 
-      <Card className="finance-card finance-soft-card">
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto]">
-          <div>
-            <Typography.Text className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-              Tahun laporan
-            </Typography.Text>
-            <DatePicker
-              picker="year"
-              value={selectedYear ? dayjs(`${selectedYear}-01-01`) : null}
-              onChange={(value) => setSelectedYear(value ? String(value.year()) : String(currentBookMonth.year))}
-              size="large"
-              className="mt-2 !w-full"
-              format="YYYY"
+      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard
+          label="Pemasukan"
+          value={formatters.compact(summary.income)}
+          tone="success"
+          loading={loading}
+        />
+        <StatCard
+          label="Pengeluaran"
+          value={formatters.compact(summary.expense)}
+          tone="danger"
+          loading={loading}
+        />
+        <StatCard
+          label="Arus kas bersih"
+          value={formatters.compact(summary.net)}
+          tone={summary.net >= 0 ? "success" : "danger"}
+          loading={loading}
+        />
+        <StatCard
+          label="Rasio menabung"
+          value={formatters.percent(summary.savingRate)}
+          tone={summary.savingRate >= 20 ? "success" : "warning"}
+          helper={`${summary.count} transaksi`}
+          loading={loading}
+        />
+      </div>
+
+      <div className="ds-card mb-4 p-3">
+        <div className="flex flex-wrap items-end gap-3">
+          <Field label="Rentang">
+            <RangePicker
+              value={range}
+              onChange={(value) => value && setRange(value)}
+              format={general.dateFormat}
+              presets={buildRangePresets(general)}
+              allowClear={false}
+              className="!w-full sm:!w-[280px]"
             />
-          </div>
+          </Field>
 
-          <div>
-            <Typography.Text className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-              Filter user
-            </Typography.Text>
-            <Select
-              size="large"
-              className="mt-2 !w-full"
-              value={activeMemberId}
-              onChange={setActiveMemberId}
+          <Field label="Jenis">
+            <Segmented
+              value={type}
+              onChange={setType}
               options={[
-                { value: "all", label: "Semua user" },
-                ...members.map((member) => ({
-                  value: member.id,
-                  label: member.fullName || member.name || member.email
+                { label: "Semua", value: "all" },
+                ...catalogue.transactionTypes.map((item) => ({
+                  label: item.label,
+                  value: item.id
                 }))
               ]}
             />
-          </div>
+          </Field>
 
-          <div className="flex items-end gap-2">
-            <Button
-              type="primary"
-              size="large"
-              className="w-full"
-              onClick={() =>
-                exportLaporanTahunanExcel({
-                  year: selectedYear,
-                  transactions: yearTransactions,
-                  familyName: family?.name
-                })
-              }
-            >
-              Export Excel
-            </Button>
-          </div>
+          <Field label="Kategori">
+            <MultiSelect
+              size="middle"
+              value={categoryIds}
+              onChange={setCategoryIds}
+              options={catalogue.categoryOptions()}
+              className="sm:!w-[220px]"
+            />
+          </Field>
+
+          <Typography.Text className="!ml-auto !text-caption !text-muted">
+            <Badge tone="neutral">{filtered.length} transaksi</Badge>
+          </Typography.Text>
         </div>
-
-        <Typography.Paragraph className="!mb-0 !mt-3 !text-[12px] !leading-5 !text-muted">
-           Anda bisa filter per user untuk melihat tren pemasukan, pengeluaran, tabungan, dan pembayaran hutang dengan lebih fokus. Setiap bulan mengikuti periode tutup buku tanggal 27 sampai 26.
-        </Typography.Paragraph>
-
-        <Link to="/dashboard/admin" className="mt-3 inline-block !no-underline">
-          <Button size="middle">
-            Buka admin data
-          </Button>
-        </Link>
-      </Card>
-
-      <div className="grid grid-cols-2 gap-2">
-        <MetricCard label="Pemasukan" value={summary.incomeMonth} tone="income" />
-        <MetricCard label="Pengeluaran" value={summary.expenseMonth} tone="expense" />
-        <MetricCard label="Arus kas bersih" value={summary.netCashflow} tone="margin" />
-        <MetricCard label="Total nabung" value={yearTotals.totalSavings} tone="savings" />
-        <MetricCard label="Bayar hutang" value={yearTotals.totalDebtPaid} tone="warning" />
-        <MetricCard label="Piutang masuk" value={yearTotals.totalReceivableCollected} tone="default" />
       </div>
-      
-      {/* Monthly Trend */}
-      <Card className="finance-card">
-        <SectionHeading eyebrow="Pergerakan" title={`Comparison per bulan ${selectedYear}`} />
-        <Typography.Paragraph className="!mb-0 !mt-1 !text-[12px] !leading-5 !text-muted">
-          Grafik ini menampilkan pergerakan pemasukan, pengeluaran, dan arus kas bersih dari Januari sampai Desember pada tahun yang dipilih, dengan range 27 bulan sebelumnya sampai 26 bulan berjalan.
-        </Typography.Paragraph>
-        <div className="mt-4 h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={monthlyDataset} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
-              <CartesianGrid vertical={false} stroke={themePalette.colors.lineSoft} strokeDasharray="3 3" />
-              <XAxis
-                dataKey="month"
-                tickLine={false}
-                axisLine={false}
-                tick={{ fill: themePalette.colors.muted, fontSize: 11 }}
-              />
-              <YAxis
-                width={44}
-                tickLine={false}
-                axisLine={false}
-                tick={{ fill: themePalette.colors.muted, fontSize: 11 }}
-                tickFormatter={(value) => formatCompactCurrency(value)}
-              />
-              <Tooltip
-                formatter={(value) => formatCurrency(value)}
-                labelFormatter={(label, payload) => payload?.[0]?.payload?.periodLabel || label}
-              />
-              <Legend
-                verticalAlign="top"
-                height={24}
-                formatter={(value) => (
-                  <span style={{ color: themePalette.colors.inkMuted, fontSize: 11, fontWeight: 600 }}>
-                    {value === "income" ? "Pemasukan" : value === "expense" ? "Pengeluaran" : "Arus kas bersih"}
-                  </span>
-                )}
-              />
-              <Line
-                type="monotone"
-                dataKey="income"
-                stroke={themePalette.colors.success}
-                strokeWidth={2.5}
-                dot={{ r: 2.5, strokeWidth: 0, fill: themePalette.colors.success }}
-                activeDot={{ r: 4 }}
-                name="income"
-              />
-              <Line
-                type="monotone"
-                dataKey="expense"
-                stroke={themePalette.colors.expense}
-                strokeWidth={2.5}
-                dot={{ r: 2.5, strokeWidth: 0, fill: themePalette.colors.expense }}
-                activeDot={{ r: 4 }}
-                name="expense"
-              />
-              <Line
-                type="monotone"
-                dataKey="net"
-                stroke={themePalette.colors.margin}
-                strokeWidth={2}
-                strokeDasharray="6 4"
-                dot={{ r: 2, strokeWidth: 0, fill: themePalette.colors.margin }}
-                activeDot={{ r: 4 }}
-                name="net"
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </Card>
 
-      {/* <section className="space-y-2.5">
-        <SectionHeading eyebrow="Kategori" title={`Kategori terbesar tahun ${selectedYear}`} />
-        {categoryComposition.length ? (
-          <Card className="finance-card">
-            <div className="grid gap-3 lg:grid-cols-[220px_1fr]">
-              <div className="h-[220px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Tooltip formatter={(value) => formatCurrency(value)} />
-                    <Legend
-                      verticalAlign="bottom"
-                      align="center"
-                      iconType="circle"
-                      formatter={(value) => (
-                        <span style={{ color: themePalette.colors.inkMuted, fontSize: 11, fontWeight: 600 }}>
-                          {value}
-                        </span>
-                      )}
-                    />
-                    <Pie
-                      data={categoryComposition}
-                      dataKey="value"
-                      nameKey="name"
-                      innerRadius={50}
-                      outerRadius={82}
-                      paddingAngle={3}
-                      stroke={themePalette.colors.panel}
-                      strokeWidth={4}
-                    >
-                      {categoryComposition.map((entry) => (
-                        <Cell key={entry.name} fill={entry.color} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className="space-y-2">
-                {categoryComposition.map((item) => (
-                  <div key={item.name} className="flex items-center justify-between rounded-[12px] border border-line bg-panel px-3 py-2.5">
-                    <div className="flex min-w-0 items-center gap-2.5">
-                      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                      <div className="min-w-0">
-                        <Typography.Text className="!block !truncate !text-[12px] !font-semibold !text-ink">
-                          {item.name}
-                        </Typography.Text>
-                        <Typography.Text className="!text-[11px] !text-muted">
-                          {item.percent}% dari total
-                        </Typography.Text>
-                      </div>
-                    </div>
-                    <Typography.Text className="!text-[12px] !font-semibold !text-expense">
-                      {formatCurrency(item.value)}
-                    </Typography.Text>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </Card>
-        ) : (
-          <EmptyState
-            title="Belum ada pengeluaran"
-            description="Kategori pengeluaran terbesar akan tampil setelah transaksi expense mulai tercatat."
-          />
-        )}
-      </section> */}
-
-      {/* User Comparison */}
-      <section className="space-y-2.5">
-        <SectionHeading eyebrow="User" title={`Perbandingan penginput tahun ${selectedYear}`} />
-        {users.length ? (
-          <div className="space-y-2">
-            {users.map((item) => (
-              <Card key={item.name} className="finance-card finance-soft-card">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <Typography.Text className="!block !text-[12px] !font-semibold !text-ink">
-                      {item.name}
-                    </Typography.Text>
-                    <Typography.Text className="!text-[11px] !text-muted">
-                      {item.count} transaksi tercatat
-                    </Typography.Text>
-                  </div>
-                  <Typography.Text className="!text-[12px] !font-semibold !text-primary">
-                    {formatCurrency(item.expense)}
-                  </Typography.Text>
-                </div>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <EmptyState
-            title="Belum ada data user"
-            description="Perbandingan penginput akan muncul setelah transaksi pada tahun ini tersedia."
-          />
-        )}
-      </section>
-
-        {/* Monthly Comparison */}
-      <Card className="finance-card">
-        <SectionHeading eyebrow="Bulanan" title="Comparison bulanan yang lebih ringkas" />
-        <Typography.Paragraph className="!mb-0 !mt-1 !text-[12px] !leading-5 !text-muted">
-          Klik satu bulan untuk membuka detail lengkap seperti cashflow, nabung, hutang dibayar, dan ringkasan aktivitas di bulan tersebut.
-        </Typography.Paragraph>
-
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          {monthlyDataset.map((item) => {
-            const netPositive = item.net >= 0;
-            const dominantValue = Math.max(item.income, item.expense, item.savings, item.debtPaid, 1);
-            const incomeWidth = Math.max((item.income / dominantValue) * 100, item.income > 0 ? 10 : 0);
-            const expenseWidth = Math.max((item.expense / dominantValue) * 100, item.expense > 0 ? 10 : 0);
-
-            return (
-              <button
-                key={item.month}
-                type="button"
-                onClick={() => setSelectedMonth(item.monthIndex)}
-                className="rounded-[16px] border border-line bg-panel px-3 py-3 text-left transition hover:border-line-hover hover:bg-white/5"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <Typography.Text strong className="!block !text-[13px] !font-semibold !text-ink">
-                      {item.month}
-                    </Typography.Text>
-                    <Typography.Text className="!mt-1 !block !text-[10px] !text-muted">
-                      {item.periodLabel}
-                    </Typography.Text>
-                    <Typography.Text className={`!mt-1 !block !text-[11px] !font-semibold ${netPositive ? "!text-income" : "!text-expense"}`}>
-                      {netPositive ? "Surplus" : "Defisit"} {formatCompactCurrency(Math.abs(item.net))}
-                    </Typography.Text>
-                  </div>
-                  <Typography.Text className="!text-[10px] !uppercase !tracking-[0.12em] !text-muted">
-                    Detail
-                  </Typography.Text>
-                </div>
-
-                <div className="mt-3 space-y-2">
-                  <div>
-                    <div className="mb-1 flex items-center justify-between gap-2">
-                      <Typography.Text className="!text-[10px] !font-medium !uppercase !tracking-[0.12em] !text-muted">
-                        Pemasukan
-                      </Typography.Text>
-                      <Typography.Text className="!text-[11px] !font-semibold !text-income">
-                        {formatCompactCurrency(item.income)}
-                      </Typography.Text>
-                    </div>
-                    <div className="h-1.5 rounded-full bg-panel-header">
-                      <div
-                        className="h-1.5 rounded-full bg-income"
-                        style={{ width: `${Math.min(incomeWidth, 100)}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="mb-1 flex items-center justify-between gap-2">
-                      <Typography.Text className="!text-[10px] !font-medium !uppercase !tracking-[0.12em] !text-muted">
-                        Pengeluaran
-                      </Typography.Text>
-                      <Typography.Text className="!text-[11px] !font-semibold !text-expense">
-                        {formatCompactCurrency(item.expense)}
-                      </Typography.Text>
-                    </div>
-                    <div className="h-1.5 rounded-full bg-panel-header">
-                      <div
-                        className="h-1.5 rounded-full bg-expense"
-                        style={{ width: `${Math.min(expenseWidth, 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-3 flex items-center justify-between gap-2 border-t border-line pt-2">
-                  <Typography.Text className="!text-[10px] !text-muted">
-                    Nabung {formatCompactCurrency(item.savings)}
-                  </Typography.Text>
-                  <Typography.Text className="!text-[10px] !text-muted">
-                    Bayar hutang {formatCompactCurrency(item.debtPaid)}
-                  </Typography.Text>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </Card>
-
-      <MonthlyDetailModal
-        detail={selectedMonthDetail}
-        activeMemberId={activeMemberId}
-        onClose={() => setSelectedMonth(null)}
-      />
+      <Tabs items={tabs} />
     </div>
   );
-}
-
-function mapTransactionToInvoiceRow(item) {
-  return {
-    title: item.title || item.categoryName || "Transaksi",
-    note: item.note || item.description || "-",
-    category: item.categoryName || "-",
-    time: item.date ? `${formatDate(item.date)}${item.createdAt?.seconds ? ` ${dayjs.unix(item.createdAt.seconds).format("HH:mm")}` : ""}` : "-",
-    amount: Number(item.amount || 0)
-  };
-}
-
-function MonthlyDetailModal({ detail, activeMemberId, onClose }) {
-  const open = Boolean(detail);
-
-  return (
-    <Modal
-      open={open}
-      onCancel={onClose}
-      footer={null}
-      title={null}
-      centered
-      width={420}
-      styles={{ content: { background: themePalette.colors.panel, padding: 16 }, body: { padding: 0 } }}
-    >
-      {detail ? (
-        <Space orientation="vertical" size={12} className="w-full">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <Typography.Title level={4} className="!mb-0 !text-[15px]">
-                Detail {detail.month} {detail.year}
-              </Typography.Title>
-              <Typography.Text className="mt-1 block !text-[12px] !text-muted">
-                {formatDate(detail.startDate)} - {formatDate(detail.endDate)}
-              </Typography.Text>
-              <Typography.Text className="mt-1 block !text-[11px] !text-muted">
-                {activeMemberId === "all" ? "Global keluarga" : "Filter user aktif"}
-              </Typography.Text>
-            </div>
-            <Tag className={`rounded-full border-0 px-3 py-1 text-xs font-semibold ${detail.net >= 0 ? "bg-income/15 text-income" : "bg-expense/15 text-expense"}`}>
-              {detail.net >= 0 ? "Cashflow positif" : "Cashflow negatif"}
-            </Tag>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <DetailInfo label="Pemasukan" value={detail.income} tone="income" />
-            <DetailInfo label="Pengeluaran" value={detail.expense} tone="expense" />
-            <DetailInfo label="Arus kas bersih" value={detail.net} tone={detail.net >= 0 ? "margin" : "expense"} />
-            <DetailInfo label="Total nabung" value={detail.savings} tone="savings" />
-            <DetailInfo label="Bayar hutang" value={detail.debtPaid} tone="warning" />
-            <DetailInfo label="Piutang masuk" value={detail.receivableCollected} tone="default" />
-          </div>
-
-          <div className="rounded-[14px] border border-line bg-panel px-3 py-3">
-            <Typography.Text className="metric-label">Ringkasan aktivitas</Typography.Text>
-            <div className="mt-2 grid grid-cols-2 gap-2 text-[12px] text-muted">
-              <div>Jumlah transaksi: <span className="font-semibold text-ink">{detail.transactionCount}</span></div>
-              <div>Setoran tabungan: <span className="font-semibold text-ink">{detail.savingsCount}</span></div>
-              <div>Pembayaran hutang: <span className="font-semibold text-ink">{detail.debtPaymentCount}</span></div>
-              <div>Pelunasan piutang: <span className="font-semibold text-ink">{detail.receivablePaymentCount}</span></div>
-            </div>
-          </div>
-        </Space>
-      ) : null}
-    </Modal>
-  );
-}
-
-function DetailInfo({ label, value, tone = "default" }) {
-  return <MetricCard label={label} value={value} tone={tone} />;
-}
-
-function filterByYearAndUser(items, dateField, year, userId) {
-  return items.filter((item) => {
-    const dateValue = item[dateField];
-    if (!dateValue) return false;
-    const matchYear = isInBookYear(dateValue, year);
-    const matchUser = userId === "all" ? true : item.userId === userId;
-    return matchYear && matchUser;
-  });
-}
-
-function buildMonthlyReportDataset({ year, transactions, savingContributions, financePayments, financeRecordMap }) {
-  return MONTH_LABELS.map((month, monthIndex) => {
-    const range = getBookMonthRange(year, monthIndex);
-    const monthTransactions = transactions.filter((item) => inDateRange(item.date, range.startDate, range.endDate));
-    const monthSavings = savingContributions.filter((item) => inDateRange(item.date, range.startDate, range.endDate));
-    const monthPayments = financePayments.filter((item) => inDateRange(item.paymentDate, range.startDate, range.endDate));
-
-    const income = sumAmount(monthTransactions.filter((item) => item.type === "income"));
-    const expense = sumAmount(monthTransactions.filter((item) => item.type === "expense"));
-    const savings = sumAmount(monthSavings);
-    const debtPayments = monthPayments.filter((item) => financeRecordMap[item.financeRecordId]?.recordType === "debt");
-    const receivablePayments = monthPayments.filter((item) => financeRecordMap[item.financeRecordId]?.recordType === "receivable");
-    const debtPaid = sumAmount(debtPayments);
-    const receivableCollected = sumAmount(receivablePayments);
-
-    return {
-      month,
-      monthIndex,
-      year,
-      startDate: range.startDate,
-      endDate: range.endDate,
-      periodLabel: `${formatDate(range.startDate, "DD MMM")} - ${formatDate(range.endDate, "DD MMM")}`,
-      income,
-      expense,
-      net: income - expense,
-      savings,
-      debtPaid,
-      receivableCollected,
-      transactionCount: monthTransactions.length,
-      savingsCount: monthSavings.length,
-      debtPaymentCount: debtPayments.length,
-      receivablePaymentCount: receivablePayments.length
-    };
-  });
-}
-
-function sumAmount(items) {
-  return items.reduce((total, item) => total + Number(item.amount || 0), 0);
-}
-
-function buildCategoryComposition(categories) {
-  const palette = [
-    themePalette.colors.expense,
-    themePalette.colors.warning,
-    themePalette.colors.primary,
-    themePalette.colors.info,
-    themePalette.colors.margin,
-    themePalette.colors.success
-  ];
-
-  const items = categories
-    .filter((item) => Number(item.value || 0) > 0)
-    .map((item, index) => ({
-      ...item,
-      color: palette[index % palette.length]
-    }));
-
-  const total = items.reduce((sum, item) => sum + Number(item.value || 0), 0) || 1;
-
-  return items.map((item) => ({
-    ...item,
-    percent: Math.round((Number(item.value || 0) / total) * 100)
-  }));
 }

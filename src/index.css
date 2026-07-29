@@ -1,241 +1,379 @@
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap");
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * These values are the "Daylight" theme, present only so the first paint (before
+ * JS runs) is already styled. `applyTheme()` overwrites all of them on boot and
+ * on every theme switch — this block is never the source of truth.
+ */
 @layer base {
   :root {
-    --color-canvas: #161321;
-    --color-canvas-soft: #1a1627;
-    --color-canvas-strong: #120f1c;
-    --color-ink: #f5f3ff;
-    --color-ink-soft: #ece9ff;
-    --color-ink-muted: #cdc6f4;
-    --color-muted: #9890bc;
-    --color-muted-soft: #777096;
-    --color-line: #332d49;
-    --color-line-soft: #2a243d;
-    --color-line-hover: #443d60;
-    --color-panel: #292829;
-    --color-panel-soft: #262039;
-    --color-panel-strong: #1a1627;
-    --color-panel-alt: #2a243d;
-    --color-panel-header: #241f35;
-    --color-panel-hover: #2b2540;
-    --color-progress-rail: #2d2840;
-    --color-primary: #7c5cff;
-    --color-primary-strong: #6c4ef3;
-    --color-primary-border: #8e74ff;
-    --color-primary-soft: #2f2750;
-    --color-success: #33d17a;
-    --color-expense: #ff6178;
-    --color-warning: #f6b24b;
-    --color-info: #8b7dff;
-    --color-white: #ffffff;
-    --color-canvas-rgb: 22 19 33;
-    --color-ink-rgb: 245 243 255;
-    --color-muted-rgb: 152 144 188;
-    --color-line-rgb: 51 45 73;
-    --color-panel-rgb: 33 28 48;
-    --color-primary-rgb: 124 92 255;
-    --color-income-rgb: 51 209 122;
-    --color-expense-rgb: 255 97 120;
-    --color-warning-rgb: 246 178 75;
-    --shadow-card: 0 14px 30px rgba(8, 6, 18, 0.34);
-    --font-app: "IBM Plex Sans", "Segoe UI", sans-serif;
+    --color-bg: #f5f5f5;
+    --color-bg-rgb: 245 245 245;
+    --color-bg-subtle: #ebebeb;
+    --color-bg-subtle-rgb: 235 235 235;
+    --color-surface: #ffffff;
+    --color-surface-rgb: 255 255 255;
+    --color-surface-raised: #ffffff;
+    --color-surface-raised-rgb: 255 255 255;
+    --color-surface-hover: #f5f5f5;
+    --color-surface-hover-rgb: 245 245 245;
+    --color-surface-sunken: #ebebeb;
+    --color-surface-sunken-rgb: 235 235 235;
+    --color-border: #d6d6d6;
+    --color-border-rgb: 214 214 214;
+    --color-border-strong: #adadad;
+    --color-border-strong-rgb: 173 173 173;
+    --color-text: #000000;
+    --color-text-rgb: 0 0 0;
+    --color-text-secondary: #5c5c5c;
+    --color-text-secondary-rgb: 92 92 92;
+    --color-text-tertiary: #8f8f8f;
+    --color-text-tertiary-rgb: 143 143 143;
+    --color-text-inverse: #ffffff;
+    --color-text-inverse-rgb: 255 255 255;
+    --color-primary: #2d68c4;
+    --color-primary-rgb: 45 104 196;
+    --color-primary-hover: #245aae;
+    --color-primary-hover-rgb: 36 90 174;
+    --color-primary-active: #1b4d89;
+    --color-primary-active-rgb: 27 77 137;
+    --color-primary-soft: #edf3fc;
+    --color-primary-soft-rgb: 237 243 252;
+    --color-primary-border: #a3c4ec;
+    --color-primary-border-rgb: 163 196 236;
+    --color-primary-ink: #2d68c4;
+    --color-primary-ink-rgb: 45 104 196;
+    --color-on-primary: #ffffff;
+    --color-on-primary-rgb: 255 255 255;
+    --color-secondary: #0e7c7b;
+    --color-secondary-rgb: 14 124 123;
+    --color-secondary-soft: #e6f4f4;
+    --color-secondary-soft-rgb: 230 244 244;
+    --color-secondary-ink: #0b6968;
+    --color-secondary-ink-rgb: 11 105 104;
+    --color-tertiary: #d92d6b;
+    --color-tertiary-rgb: 217 45 107;
+    --color-tertiary-soft: #fce9f1;
+    --color-tertiary-soft-rgb: 252 233 241;
+    --color-tertiary-ink: #c02259;
+    --color-tertiary-ink-rgb: 192 34 89;
+    --color-success: #0e7c7b;
+    --color-success-rgb: 14 124 123;
+    --color-success-soft: #e6f4f4;
+    --color-success-soft-rgb: 230 244 244;
+    --color-success-ink: #0b6968;
+    --color-success-ink-rgb: 11 105 104;
+    --color-warning: #d9a32b;
+    --color-warning-rgb: 217 163 43;
+    --color-warning-soft: #fdf6e3;
+    --color-warning-soft-rgb: 253 246 227;
+    --color-warning-ink: #7e5d11;
+    --color-warning-ink-rgb: 126 93 17;
+    --color-danger: #d92d6b;
+    --color-danger-rgb: 217 45 107;
+    --color-danger-soft: #fce9f1;
+    --color-danger-soft-rgb: 252 233 241;
+    --color-danger-ink: #c02259;
+    --color-danger-ink-rgb: 192 34 89;
+    --color-info: #2d68c4;
+    --color-info-rgb: 45 104 196;
+    --color-info-soft: #edf3fc;
+    --color-info-soft-rgb: 237 243 252;
+    --color-info-ink: #2d68c4;
+    --color-info-ink-rgb: 45 104 196;
+    --color-income: #0e7c7b;
+    --color-income-rgb: 14 124 123;
+    --color-income-ink: #0b6968;
+    --color-income-ink-rgb: 11 105 104;
+    --color-expense: #d92d6b;
+    --color-expense-rgb: 217 45 107;
+    --color-expense-ink: #c02259;
+    --color-expense-ink-rgb: 192 34 89;
+
+    --chart-1: #2d68c4;
+    --chart-1-rgb: 45 104 196;
+    --chart-2: #0e7c7b;
+    --chart-2-rgb: 14 124 123;
+    --chart-3: #d92d6b;
+    --chart-3-rgb: 217 45 107;
+    --chart-4: #d9a32b;
+    --chart-4-rgb: 217 163 43;
+    --chart-5: #ff8c5a;
+    --chart-5-rgb: 255 140 90;
+    --chart-6: #6699db;
+    --chart-6-rgb: 102 153 219;
+    --chart-7: #2fa8a5;
+    --chart-7-rgb: 47 168 165;
+    --chart-8: #b02f62;
+    --chart-8-rgb: 176 47 98;
+
+    --radius-xs: 6px;
+    --radius-sm: 8px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --radius-xl: 18px;
+    --radius-xxl: 24px;
+    --radius-pill: 999px;
+
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.07), 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 14px 34px rgba(0, 0, 0, 0.12);
+    --shadow-focus: 0 0 0 3px rgba(45, 104, 196, 0.28);
+
+    --sidebar-width: 252px;
+    --sidebar-collapsed-width: 76px;
+    --header-height: 62px;
+    --bottom-nav-height: 66px;
+
+    --font-display: "Inter", -apple-system, "Segoe UI", sans-serif;
+    --font-body: "Inter", -apple-system, "Segoe UI", sans-serif;
+    --font-scale: 1;
   }
 
   html {
-    font-family: var(--font-app);
-    color: var(--color-ink);
-    background-color: var(--color-canvas);
+    font-family: var(--font-body);
+    -webkit-tap-highlight-color: transparent;
+    /* Theme swaps repaint every surface at once; a short transition keeps that
+       from reading as a flash. */
+    transition: background-color 240ms ease, color 240ms ease;
   }
-/* 
-  body {
-    background:
-      radial-gradient(circle at top left, rgb(var(--color-primary-rgb) / 0.08), transparent 18%),
-      linear-gradient(180deg, var(--color-canvas-soft) 0%, var(--color-canvas-strong) 100%);
-    @apply m-0 min-h-screen text-ink antialiased;
-  } */
 
-  * {
-    @apply border-line;
+  body {
+    @apply m-0 min-h-screen bg-canvas text-ink antialiased;
+    font-size: calc(14px * var(--font-scale, 1));
+    line-height: 1.55;
+  }
+
+  /*
+   * Decorative wash for themes that declare one. A fixed layer behind the
+   * content rather than `background-attachment: fixed`, which stutters badly
+   * on iOS Safari. Themes without a backdrop resolve to `none` and pay nothing.
+   */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: var(--app-backdrop, none);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
   }
 
   #root {
     min-height: 100vh;
   }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border-strong) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--color-border-strong);
+    border: 3px solid transparent;
+    border-radius: var(--radius-pill);
+    background-clip: content-box;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: rgb(var(--color-primary-rgb) / 0.24);
+  }
 }
 
 @layer components {
-  .metric-label {
-    @apply text-[11px] font-medium uppercase tracking-[0.14em] text-muted;
+  /* ---------------------------------------------------------------- layout */
+
+  .app-main {
+    transition: padding-left 180ms cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  .app-phone-shell {
-    @apply mx-auto min-h-screen w-full max-w-md;
+  @media (min-width: 768px) {
+    .app-main {
+      padding-left: var(--sidebar-collapsed-width);
+    }
   }
 
-  .ant-card.finance-card {
-    box-shadow: var(--shadow-card);
-    border-color: var(--color-line);
-    background: var(--color-panel);
+  @media (min-width: 1024px) {
+    .app-main {
+      padding-left: var(--sidebar-width);
+    }
+
+    .app-shell[data-sidebar="collapsed"] .app-main {
+      padding-left: var(--sidebar-collapsed-width);
+    }
   }
 
-  .ant-card.finance-soft-card {
-    background: linear-gradient(180deg, var(--color-panel-soft) 0%, var(--color-panel-strong) 100%);
+  .app-header {
+    background: rgb(var(--color-surface-rgb) / 0.88);
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--color-border);
   }
 
-  .finance-glass {
-    background: rgba(22, 19, 33, 0.9);
-    backdrop-filter: blur(12px);
-    border-top: 1px solid rgb(var(--color-line-rgb) / 0.8);
+  .app-sidebar {
+    background: var(--color-surface);
+    border-right: 1px solid var(--color-border);
+    transition: width 180ms cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  .finance-section {
-    margin-bottom: 16px;
+  /* Tablets always get the icon rail. The label is hidden rather than
+     unmounted so the collapse animation stays smooth. */
+  @media (min-width: 768px) and (max-width: 1023px) {
+    .app-sidebar {
+      width: var(--sidebar-collapsed-width) !important;
+      min-width: var(--sidebar-collapsed-width) !important;
+      max-width: var(--sidebar-collapsed-width) !important;
+      flex: 0 0 var(--sidebar-collapsed-width) !important;
+    }
+
+    .app-sidebar .nav-label,
+    .app-sidebar .nav-group-label {
+      display: none;
+    }
   }
 
-  .finance-chip {
-    display: inline-flex;
-    align-items: center;
-    border-radius: 999px;
-    padding: 4px 10px;
-    font-size: 11px;
-    font-weight: 700;
+  .app-shell[data-sidebar="collapsed"] .nav-label,
+  .app-shell[data-sidebar="collapsed"] .nav-group-label {
+    display: none;
   }
 
-  .finance-chip-income {
-    background: rgb(var(--color-primary-rgb) / 0.14);
-    color: var(--color-success);
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
-  .finance-chip-expense {
-    background: rgb(var(--color-expense-rgb) / 0.14);
-    color: var(--color-expense);
+  /* ------------------------------------------------------------ primitives */
+
+  .ds-card {
+    @apply rounded-lg border border-line bg-surface;
+    box-shadow: var(--shadow-xs);
   }
 
-  .ant-input,
-  .ant-input-number,
-  .ant-input-number-input,
-  .ant-input-affix-wrapper,
-  .ant-input-outlined,
-  .ant-select-selector,
-  .ant-picker,
-  .ant-radio-button-wrapper,
-  .ant-btn-default {
-    background: var(--color-panel) !important;
-    color: var(--color-ink) !important;
-    border-color: var(--color-line) !important;
+  .ds-card-interactive {
+    transition: box-shadow 180ms ease, border-color 180ms ease, transform 180ms ease;
   }
 
-  .ant-radio-group.finance-type-toggle {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 6px;
+  .ds-card-interactive:hover {
+    border-color: var(--color-border-strong);
+    box-shadow: var(--shadow-md);
   }
 
-  .ant-radio-group.finance-type-toggle .ant-radio-button-wrapper {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 48px;
-    border-radius: 14px !important;
-    border: 1px solid var(--color-line) !important;
-    background: var(--color-panel) !important;
-    color: var(--color-ink-muted) !important;
-    font-weight: 700;
-    text-align: center;
-    padding-inline: 10px !important;
-    box-shadow: none !important;
-    font-size: 13px !important;
+  .ds-eyebrow {
+    @apply text-caption font-semibold uppercase tracking-[0.08em] text-muted;
   }
 
-  .ant-radio-group.finance-type-toggle .ant-radio-button-wrapper::before {
-    display: none !important;
+  .ds-skeleton {
+    @apply relative overflow-hidden rounded-sm bg-surface-sunken;
   }
 
-  .ant-radio-group.finance-type-toggle .ant-radio-button-wrapper-checked {
-    border-color: var(--color-primary-border) !important;
-    background: var(--color-primary-soft) !important;
-    color: var(--color-primary-strong) !important;
-    box-shadow: none !important;
+  .ds-skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgb(var(--color-surface-rgb) / 0.55), transparent);
+    animation: shimmer 1.4s infinite;
   }
 
-  .ant-radio-group.finance-type-toggle .ant-radio-button-wrapper:not(.ant-radio-button-wrapper-checked):hover {
-    border-color: var(--color-line-hover) !important;
-    color: var(--color-ink) !important;
-  }
-
-  .ant-input::placeholder,
-  .ant-input-number-input::placeholder,
-  .ant-select-selection-placeholder,
-  .ant-input-password input::placeholder,
-  .ant-input-affix-wrapper input::placeholder {
-    color: var(--color-muted-soft) !important;
-  }
-
-  .ant-card .ant-card-body,
-  .ant-table,
-  .ant-table-container,
-  .ant-table-tbody > tr > td,
-  .ant-table-thead > tr > th,
-  .ant-list-item {
-    color: var(--color-ink-soft);
-  }
-
-  .ant-table-thead > tr > th {
-    background: var(--color-panel-header) !important;
-    border-bottom-color: var(--color-line) !important;
-    font-size: 12px !important;
-  }
-
-  .ant-table-tbody > tr > td {
-    background: var(--color-panel) !important;
-    border-bottom-color: var(--color-line-soft) !important;
-    font-size: 12px !important;
-  }
-
-  .ant-table-wrapper .ant-table-tbody > tr.ant-table-row:hover > td {
-    background: var(--color-panel-hover) !important;
-  }
-
-  .ant-tag {
-    border-color: transparent !important;
-  }
-
-  .ant-btn-primary {
-    box-shadow: none !important;
-    font-weight: 700;
-    color: var(--color-white) !important;
-  }
-
-  .ant-progress-inner {
-    background-color: var(--color-progress-rail) !important;
-  }
-
-  .ant-form-item {
-    margin-bottom: 10px !important;
-  }
-
-  .ant-progress-text {
-    font-size: 12px !important;
-    font-weight: 600 !important;
-    color: var(--color-ink-muted) !important;
-  }
-
-  .ant-typography,
-  .ant-typography strong {
-    letter-spacing: -0.01em;
-  }
-
-  .app-scroll-hidden {
+  .ds-scrollbar-hidden {
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
 
-  .app-scroll-hidden::-webkit-scrollbar {
+  .ds-scrollbar-hidden::-webkit-scrollbar {
     display: none;
+  }
+
+  .ds-scroll-x {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ---------------------------------------------------- ant design bindings */
+
+  /* Ant renders into portals with its own tokens; these rules pin the few
+     surfaces that would otherwise ignore a theme switch. */
+  .ant-card,
+  .ant-modal-content,
+  .ant-drawer-content,
+  .ant-dropdown-menu,
+  .ant-select-dropdown,
+  .ant-picker-panel-container,
+  .ant-popover-inner {
+    background: var(--color-surface) !important;
+    color: var(--color-text);
+  }
+
+  .ant-table-thead > tr > th {
+    background: var(--color-surface-sunken) !important;
+    color: var(--color-text-secondary) !important;
+    font-size: calc(12px * var(--font-scale, 1)) !important;
+    font-weight: 600 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom-color: var(--color-border) !important;
+  }
+
+  .ant-table-tbody > tr > td {
+    font-size: calc(13px * var(--font-scale, 1));
+    border-bottom-color: var(--color-border) !important;
+  }
+
+  .ant-table-wrapper .ant-table-tbody > tr.ant-table-row:hover > td {
+    background: var(--color-surface-hover) !important;
+  }
+
+  .ant-btn {
+    font-weight: 500;
+    box-shadow: none !important;
+  }
+
+  .ant-btn-primary {
+    font-weight: 600;
+  }
+
+  .ant-form-item-label > label {
+    font-size: calc(13px * var(--font-scale, 1)) !important;
+    font-weight: 500 !important;
+    color: var(--color-text) !important;
+  }
+
+  .ds-segmented-lg .ant-segmented-item {
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+  }
+
+  .recharts-wrapper text {
+    font-family: var(--font-body);
+    font-size: calc(11px * var(--font-scale, 1));
+    fill: var(--color-text-secondary);
+  }
+
+  .recharts-cartesian-grid line {
+    stroke: var(--color-border);
   }
 }
