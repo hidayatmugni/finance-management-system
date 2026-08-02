@@ -3,6 +3,7 @@ import { Button, DatePicker, Input, Typography } from "antd";
 import dayjs from "dayjs";
 import { useMemo, useState } from "react";
 import { useConfigSection, useFormatters } from "../../shared/config/useAppConfig";
+import { useCashflowMirror } from "../../shared/data/useCashflowMirror";
 import { useMutations } from "../../shared/data/useMutations";
 import { useFinanceStore } from "../../shared/state/useFinanceStore";
 import {
@@ -33,6 +34,7 @@ const EMPTY_CONTRIBUTION = { amount: null, date: dayjs().format("YYYY-MM-DD"), n
 export function SavingsPage() {
   const toast = useToast();
   const mutations = useMutations();
+  const { mirror } = useCashflowMirror();
   const formatters = useFormatters();
   const general = useConfigSection("general");
   const workflow = useConfigSection("workflow");
@@ -128,36 +130,38 @@ export function SavingsPage() {
     }
 
     setSubmitting(true);
+    const amount = Number(contributionForm.amount);
+
     const outcome = await mutations.create(
       "savingContributions",
       {
         savingGoalId: activeGoal.id,
         goalName: activeGoal.name,
-        amount: Number(contributionForm.amount),
+        amount,
         date: contributionForm.date,
         note: contributionForm.note.trim()
       },
       { context: "setoran", successMessage: "Setoran tercatat." },
     );
 
-    // Mirroring into cashflow is a CMS switch, so a family that tracks savings
-    // separately from spending isn't forced into double entry.
-    if (outcome.ok && workflow.automation.mirrorSavingsToCashflow) {
-      await mutations.create(
-        "transactions",
-        {
-          type: "expense",
-          amount: Number(contributionForm.amount),
-          categoryId: null,
-          categoryName: "Tabungan",
-          note: `Setoran tabungan ${activeGoal.name}`,
-          title: `Setoran tabungan ${activeGoal.name}`,
-          date: contributionForm.date,
-          sourceModule: "savings",
-          relatedSavingGoalId: activeGoal.id
-        },
-        { context: "transaksi" },
-      );
+    /*
+     * A deposit leaves the day-to-day wallet even though the money is still
+     * yours, so it is recorded as an expense — the savings balance on the
+     * dashboard is where it reappears. Still a CMS switch, for a family that
+     * tracks savings entirely outside its cashflow.
+     */
+    if (outcome.ok && workflow.automation.mirrorSavingsToCashflow !== false) {
+      await mirror({
+        preset: "savingContribution",
+        amount,
+        date: contributionForm.date,
+        note: `Setoran tabungan ${activeGoal.name}`,
+        sourceModule: "savings",
+        relations: {
+          relatedSavingGoalId: activeGoal.id,
+          relatedContributionId: outcome.result?.id || null
+        }
+      });
     }
 
     setSubmitting(false);
@@ -472,7 +476,7 @@ export function SavingsPage() {
         title={`Setor ke ${activeGoal?.name || ""}`}
         description={
           activeGoal
-            ? `Terkumpul ${formatters.currency(activeGoal.contributed)} dari ${formatters.currency(activeGoal.target)}.`
+            ? `Terkumpul ${formatters.currency(activeGoal.contributed)} dari ${formatters.currency(activeGoal.target)}. Setoran keluar dari saldo berjalan dan masuk ke saldo tabungan.`
             : null
         }
       >

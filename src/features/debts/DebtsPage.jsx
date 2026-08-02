@@ -3,6 +3,7 @@ import { Alert, Button, DatePicker, Input, Segmented, Typography } from "antd";
 import dayjs from "dayjs";
 import { useMemo, useState } from "react";
 import { useConfigSection, useFormatters } from "../../shared/config/useAppConfig";
+import { useCashflowMirror } from "../../shared/data/useCashflowMirror";
 import { useStatuses } from "../../shared/data/useCatalogue";
 import { useMutations } from "../../shared/data/useMutations";
 import { useFinanceStore } from "../../shared/state/useFinanceStore";
@@ -34,6 +35,7 @@ const EMPTY_PAYMENT = { amount: null, date: dayjs().format("YYYY-MM-DD"), note: 
 export function DebtsPage() {
   const toast = useToast();
   const mutations = useMutations();
+  const { mirror } = useCashflowMirror();
   const formatters = useFormatters();
   const general = useConfigSection("general");
   const workflow = useConfigSection("workflow");
@@ -146,22 +148,44 @@ export function DebtsPage() {
     }
 
     setSubmitting(true);
+    const amount = Number(paymentForm.amount);
+    const isDebtRecord = activeRecord.recordType === "debt";
+
     const outcome = await mutations.create(
       "financePayments",
       {
         financeRecordId: activeRecord.id,
         recordType: activeRecord.recordType,
         personName: activeRecord.personName,
-        amount: Number(paymentForm.amount),
+        amount,
         paymentDate: paymentForm.date,
         note: paymentForm.note.trim()
       },
       { context: "pembayaran", successMessage: "Pembayaran tercatat." },
     );
 
+    /*
+     * The money actually moved, so the summary has to see it: paying a debt is
+     * an expense, collecting a receivable is income. Both land in the "Lainnya"
+     * category — the payment itself is not what the budget is about.
+     */
+    if (outcome.ok && workflow.automation.mirrorDebtPaymentsToCashflow !== false) {
+      await mirror({
+        preset: isDebtRecord ? "debtPayment" : "receivableCollection",
+        amount,
+        date: paymentForm.date,
+        note: `${isDebtRecord ? "Bayar hutang" : "Terima piutang"} ${activeRecord.personName}`,
+        sourceModule: isDebtRecord ? "debt-payment" : "receivable-collection",
+        relations: {
+          relatedFinanceRecordId: activeRecord.id,
+          relatedPaymentId: outcome.result?.id || null
+        }
+      });
+    }
+
     // Closing a fully-paid record is a CMS-controlled automation.
     if (outcome.ok && workflow.automation.autoCloseSettledDebts) {
-      const totalPaid = activeRecord.paid + Number(paymentForm.amount);
+      const totalPaid = activeRecord.paid + amount;
       if (totalPaid >= activeRecord.principal) {
         await mutations.update(
           "financeRecords",
@@ -477,10 +501,10 @@ export function DebtsPage() {
         onClose={() => setPaymentDialog(false)}
         onSubmit={submitPayment}
         submitting={submitting}
-        title="Catat pembayaran"
+        title={isDebt ? "Catat pembayaran" : "Catat penerimaan"}
         description={
           activeRecord
-            ? `${activeRecord.personName} — sisa ${formatters.currency(activeRecord.remaining)} dari ${formatters.currency(activeRecord.principal)}.`
+            ? `${activeRecord.personName} — sisa ${formatters.currency(activeRecord.remaining)} dari ${formatters.currency(activeRecord.principal)}. Otomatis tercatat sebagai ${isDebt ? "pengeluaran" : "pemasukan"} kategori Lainnya di ringkasan.`
             : null
         }
       >

@@ -23,16 +23,26 @@ import {
  */
 
 export function BalanceWidget({ data, formatters, labels, loading }) {
-  const { summary, balance, deltas } = data;
+  const { summary, balance, savingsBalance, deltas } = data;
 
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
       <StatCard
         label={labels.balance}
         value={formatters.compact(balance)}
         tone={balance >= 0 ? "primary" : "danger"}
         icon={renderIcon("wallet")}
-        helper="Seluruh transaksi"
+        helper="Dipakai sehari-hari"
+        loading={loading}
+      />
+      {/* Savings left the running balance as an expense — this is where that
+          money is, so the two tiles together are the household's real total. */}
+      <StatCard
+        label={labels.savingsBalance || "Saldo tabungan"}
+        value={formatters.compact(savingsBalance || 0)}
+        tone="info"
+        icon={renderIcon("savings")}
+        helper="Simpanan, di luar saldo berjalan"
         loading={loading}
       />
       <StatCard
@@ -204,7 +214,15 @@ export function BillsWidget({ widget, data, formatters }) {
         <EmptyState compact title="Tidak ada tagihan" description="Semua kewajiban sudah tertangani." />
       ) : (
         <ul className="space-y-2">
-          {data.upcomingBills.slice(0, 5).map((bill) => (
+          {data.upcomingBills.slice(0, 5).map((bill) => {
+            // For an instalment only this month's angsuran is due, not the whole
+            // remaining principal.
+            const isInstallment = bill.recordType === "installment";
+            const amountDue = isInstallment
+              ? (bill.nextInstallment?.amount ?? bill.monthlyAmount)
+              : bill.remaining;
+
+            return (
             <li
               key={bill.id}
               className="flex items-center justify-between gap-3 rounded-md border border-line px-3 py-2.5"
@@ -216,10 +234,13 @@ export function BillsWidget({ widget, data, formatters }) {
                 <Typography.Text className="!flex !items-center !gap-1 !text-caption !text-muted">
                   <CalendarOutlined />
                   {bill.dueDate}
+                  {isInstallment
+                    ? ` · cicilan ${bill.nextInstallment?.number ?? bill.paidInstallments + 1}/${bill.tenorMonths}`
+                    : ""}
                 </Typography.Text>
               </div>
               <div className="shrink-0 text-right">
-                <Money value={bill.remaining} className="!text-body" />
+                <Money value={amountDue} className="!text-body" />
                 {bill.isOverdue ? (
                   <Badge tone="danger" size="sm" icon={<WarningOutlined />} className="mt-1">
                     {Math.abs(bill.daysRemaining)} hari lewat
@@ -231,7 +252,8 @@ export function BillsWidget({ widget, data, formatters }) {
                 )}
               </div>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </SectionCard>

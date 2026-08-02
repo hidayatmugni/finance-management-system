@@ -91,9 +91,21 @@ export function WorkflowSection() {
           />
           <AutomationToggle
             label="Setoran tabungan tercatat di arus kas"
-            description="Setiap setoran otomatis membuat transaksi pengeluaran yang sesuai."
-            checked={draft.automation.mirrorSavingsToCashflow}
+            description="Setoran keluar dari saldo berjalan sebagai pengeluaran kategori Tabungan, lalu muncul kembali sebagai saldo tabungan."
+            checked={draft.automation.mirrorSavingsToCashflow !== false}
             onChange={(value) => setAutomation({ mirrorSavingsToCashflow: value })}
+          />
+          <AutomationToggle
+            label="Pembayaran hutang & piutang tercatat di arus kas"
+            description="Bayar hutang menjadi pengeluaran, setoran piutang menjadi pemasukan — keduanya di kategori Lainnya."
+            checked={draft.automation.mirrorDebtPaymentsToCashflow !== false}
+            onChange={(value) => setAutomation({ mirrorDebtPaymentsToCashflow: value })}
+          />
+          <AutomationToggle
+            label="Setoran cicilan tercatat di arus kas"
+            description="Setiap angsuran yang disetor menjadi pengeluaran kategori Tagihan."
+            checked={draft.automation.mirrorInstallmentsToCashflow !== false}
+            onChange={(value) => setAutomation({ mirrorInstallmentsToCashflow: value })}
           />
         </div>
       </SectionCard>
