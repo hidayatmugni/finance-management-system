@@ -223,10 +223,55 @@ export function buildGoalProgress(goals, contributions = []) {
 }
 
 /**
- * Debt / receivable status.
+ * The month-by-month plan behind an instalment record.
+ *
+ * Money paid is applied to the earliest unpaid month first, which is how a
+ * lender actually allocates it — pay two months at once and the schedule shows
+ * two months cleared, not one large payment floating free of the plan. The final
+ * month absorbs any rounding so the instalments always add up to the principal.
+ *
+ * @param {{principal?:number, amountInitial?:number, amount?:number, tenorMonths?:number, monthlyAmount?:number, startDate?:string}} record
+ * @param {number} paidTotal Total already paid against the record.
+ */
+export function buildInstallmentSchedule(record, paidTotal = 0) {
+  const tenor = Math.max(Math.round(Number(record?.tenorMonths || 0)), 0);
+  if (tenor <= 0) return [];
+
+  const principal = Number(record.principal ?? record.amountInitial ?? record.amount ?? 0);
+  const monthly = Number(record.monthlyAmount || 0) || principal / tenor;
+  const startDate = toDateString(record.startDate);
+  const start = startDate ? dayjs(startDate) : null;
+
+  let unallocated = Math.max(Number(paidTotal) || 0, 0);
+
+  return Array.from({ length: tenor }, (_, index) => {
+    const amount =
+      index === tenor - 1 ? Math.max(principal - monthly * (tenor - 1), 0) : monthly;
+    const paidAmount = Math.min(unallocated, amount);
+    unallocated -= paidAmount;
+
+    return {
+      number: index + 1,
+      dueDate: start ? start.add(index, "month").format("YYYY-MM-DD") : "",
+      amount,
+      paidAmount,
+      // A tolerance of one rupiah keeps float noise from leaving a month that is
+      // paid to the cent looking unpaid.
+      isPaid: paidAmount >= amount - 1,
+      isPartial: paidAmount > 0 && paidAmount < amount - 1
+    };
+  });
+}
+
+/**
+ * Debt / receivable / instalment status.
  *
  * Payments are summed from the payment log rather than trusting a denormalised
  * `totalPaid`, so a deleted payment can never leave a stale balance behind.
+ *
+ * For instalments the deadline that matters is the *next* unpaid month, not the
+ * last one, so `dueDate` reports that — which is what makes them show up in the
+ * upcoming-bills list at the right time.
  */
 export function buildFinanceRecords(records, payments = []) {
   const today = dayjs();
@@ -241,38 +286,64 @@ export function buildFinanceRecords(records, payments = []) {
     );
     const principal = Number(record.amountInitial ?? record.amount ?? 0);
     const remaining = Math.max(principal - paid, 0);
-    const dueDate = toDateString(record.dueDate);
+    const isInstallment = record.recordType === "installment";
+
+    const tenorMonths = Math.max(Math.round(Number(record.tenorMonths || 0)), 0);
+    const schedule = isInstallment
+      ? buildInstallmentSchedule({ ...record, principal, tenorMonths }, paid)
+      : [];
+    const nextInstallment = schedule.find((item) => !item.isPaid) || null;
+    const paidInstallments = schedule.filter((item) => item.isPaid).length;
+    const finalDueDate = schedule.length
+      ? schedule[schedule.length - 1].dueDate
+      : toDateString(record.dueDate);
+
+    const dueDate = isInstallment
+      ? nextInstallment?.dueDate || finalDueDate
+      : toDateString(record.dueDate);
     const daysRemaining = dueDate ? dayjs(dueDate).diff(today, "day") : null;
     const isSettled = remaining <= 0 || record.status === "paid";
 
     return {
       ...record,
       dueDate,
+      finalDueDate,
       startDate: toDateString(record.startDate),
       principal,
       paid,
       remaining,
       percent: principal > 0 ? (paid / principal) * 100 : 0,
       paymentCount: recordPayments.length,
+      payments: recordPayments,
       daysRemaining,
       isSettled,
       isOverdue: !isSettled && daysRemaining !== null && daysRemaining < 0,
       isDueSoon: !isSettled && daysRemaining !== null && daysRemaining >= 0 && daysRemaining <= 7,
-      status: isSettled ? "paid" : daysRemaining !== null && daysRemaining < 0 ? "overdue" : "active"
+      status: isSettled ? "paid" : daysRemaining !== null && daysRemaining < 0 ? "overdue" : "active",
+
+      /* -------------------------------------------------- instalments only */
+      tenorMonths,
+      monthlyAmount:
+        Number(record.monthlyAmount || 0) || (tenorMonths > 0 ? principal / tenorMonths : 0),
+      schedule,
+      nextInstallment,
+      paidInstallments,
+      remainingInstallments: Math.max(tenorMonths - paidInstallments, 0)
     };
   });
 }
 
-/** Totals split by debt vs receivable, used by the dashboard tiles. */
+/** Totals split by debt vs receivable vs instalment, for the dashboard tiles. */
 export function getFinanceTotals(records) {
   return records.reduce(
     (accumulator, item) => {
       const amount = Number(item.remaining ?? item.amountRemaining ?? 0);
       if (item.recordType === "debt") accumulator.totalDebt += amount;
       if (item.recordType === "receivable") accumulator.totalReceivable += amount;
+      if (item.recordType === "installment") accumulator.totalInstallment += amount;
       return accumulator;
     },
-    { totalDebt: 0, totalReceivable: 0 },
+    { totalDebt: 0, totalReceivable: 0, totalInstallment: 0 },
   );
 }
 
@@ -281,6 +352,17 @@ export function getSavingsTotal(goals) {
     (total, item) => total + Number(item.contributed ?? item.currentAmount ?? 0),
     0,
   );
+}
+
+/**
+ * Money parked in savings.
+ *
+ * Deliberately summed from the contribution log rather than from the goals:
+ * a contribution left the running balance the moment it was made, whether or
+ * not its goal still exists, and the two balances must always agree on that.
+ */
+export function getSavingsBalance(contributions = []) {
+  return sumAmount(contributions);
 }
 
 /**

@@ -23,6 +23,7 @@ import {
   buildRunningBalance,
   buildSummary,
   filterByRange,
+  getSavingsBalance,
   percentChange,
   toDateString
 } from "../../shared/utils/finance";
@@ -87,7 +88,10 @@ export function DashboardPage() {
       year: dayjs().year(),
       colors,
       summary,
+      /* The wallet for day-to-day spending: savings deposits have already left
+       * it as an expense, and reappear as `savingsBalance` below. */
       balance: buildRunningBalance(transactions),
+      savingsBalance: getSavingsBalance(savingContributions),
       deltas: {
         income: percentChange(summary.income, previousSummary.income),
         expense: percentChange(summary.expense, previousSummary.expense)
@@ -102,8 +106,15 @@ export function DashboardPage() {
         notifications.budgetAlertThreshold,
       ),
       goals: buildGoalProgress(savingsGoals, savingContributions).filter((goal) => !goal.isReached),
+      // Instalments are bills too — for those `dueDate` is the next unpaid
+      // month, so the list stays ordered by what is actually owed next.
       upcomingBills: records
-        .filter((record) => record.recordType === "debt" && !record.isSettled && record.dueDate)
+        .filter(
+          (record) =>
+            ["debt", "installment"].includes(record.recordType) &&
+            !record.isSettled &&
+            record.dueDate,
+        )
         .sort((left, right) => String(left.dueDate).localeCompare(String(right.dueDate))),
       recent: [...periodTransactions]
         .sort((left, right) => toDateString(right.date).localeCompare(toDateString(left.date)))

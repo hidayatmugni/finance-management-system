@@ -73,6 +73,10 @@ export function NavigationSection() {
       editor.updateItem("items", editing.id, payload);
     } else {
       editor.addItem("items", payload);
+      editor.setList(
+        "removedItemIds",
+        (draft.removedItemIds || []).filter((id) => id !== payload.id),
+      );
     }
 
     setDialogOpen(false);
@@ -84,6 +88,12 @@ export function NavigationSection() {
       "bottomBar",
       draft.bottomBar.filter((id) => id !== item.id),
     );
+    // Remember the removal: shipped menu entries are otherwise folded back in
+    // by `resolveNavigation`, which is what lets a new page reach a family that
+    // has already customised its menu.
+    editor.setList("removedItemIds", [
+      ...new Set([...(draft.removedItemIds || []), item.id])
+    ]);
   };
 
   return (

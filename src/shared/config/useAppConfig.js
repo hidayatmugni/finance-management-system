@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { create } from "zustand";
-import { appConfigDefaults, mergeConfig } from "./appConfigDefaults";
+import { appConfigDefaults, mergeConfig, resolveNavigation } from "./appConfigDefaults";
 
 const LOCAL_KEY = "fm:appConfig";
 
@@ -23,7 +23,8 @@ function writeLocalOverrides(overrides) {
 
 function resolve(overrides) {
   return Object.keys(appConfigDefaults).reduce((accumulator, section) => {
-    accumulator[section] = mergeConfig(appConfigDefaults[section], overrides?.[section]);
+    const merged = mergeConfig(appConfigDefaults[section], overrides?.[section]);
+    accumulator[section] = section === "navigation" ? resolveNavigation(merged) : merged;
     return accumulator;
   }, {});
 }

@@ -31,6 +31,11 @@ const SavingsPage = lazy(() =>
 const DebtsPage = lazy(() =>
   import("../features/debts/DebtsPage").then((module) => ({ default: module.DebtsPage })),
 );
+const InstallmentsPage = lazy(() =>
+  import("../features/installments/InstallmentsPage").then((module) => ({
+    default: module.InstallmentsPage
+  })),
+);
 const ReportsPage = lazy(() =>
   import("../features/reports/ReportsPage").then((module) => ({ default: module.ReportsPage })),
 );
@@ -76,6 +81,7 @@ export const router = createBrowserRouter([
               { path: "budget", element: <BudgetPage /> },
               { path: "savings", element: <SavingsPage /> },
               { path: "debts", element: <DebtsPage /> },
+              { path: "installments", element: <InstallmentsPage /> },
               { path: "reports", element: <ReportsPage /> },
               { path: "categories", element: <CategoriesPage /> },
               { path: "members", element: <MembersPage /> },

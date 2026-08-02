@@ -62,6 +62,7 @@ export const appConfigDefaults = {
       { id: "budget", label: "Anggaran", path: "/dashboard/budget", icon: "budget", group: "perencanaan", enabled: true, mobile: false, permission: "budget.view" },
       { id: "savings", label: "Tabungan", path: "/dashboard/savings", icon: "savings", group: "perencanaan", enabled: true, mobile: true, permission: "savings.view" },
       { id: "debts", label: "Hutang & Piutang", path: "/dashboard/debts", icon: "debt", group: "perencanaan", enabled: true, mobile: false, permission: "debt.view" },
+      { id: "installments", label: "Cicilan", path: "/dashboard/installments", icon: "installment", group: "perencanaan", enabled: true, mobile: false, permission: "debt.view" },
       { id: "reports", label: "Laporan", path: "/dashboard/reports", icon: "reports", group: "analisa", enabled: true, mobile: true, permission: "report.view" },
       { id: "categories", label: "Kategori", path: "/dashboard/categories", icon: "categories", group: "pengaturan", enabled: true, mobile: false, permission: "category.manage" },
       { id: "members", label: "Anggota", path: "/dashboard/members", icon: "users", group: "pengaturan", enabled: true, mobile: false, permission: "member.view" },
@@ -76,7 +77,17 @@ export const appConfigDefaults = {
       { id: "pengaturan", label: "Pengaturan" }
     ],
     /** Nav ids pinned to the mobile bottom bar; `add` renders as the FAB. */
-    bottomBar: ["dashboard", "transactions", "add", "reports", "savings"]
+    bottomBar: ["dashboard", "transactions", "add", "reports", "savings"],
+    /**
+     * Default entries an admin deleted on purpose.
+     *
+     * A saved menu replaces the default list wholesale, which used to mean a
+     * menu entry shipped in a later release never reached families that had
+     * customised their navigation. New defaults are now folded in (see
+     * `resolveNavigation`), and this list is what keeps a deliberate delete
+     * deleted instead of resurrecting it on the next deploy.
+     */
+    removedItemIds: []
   },
 
   /* ------------------------------------------------------------ taxonomy */
@@ -122,13 +133,16 @@ export const appConfigDefaults = {
     /** UI strings that a family may want to reword. */
     labels: {
       balance: "Saldo berjalan",
+      /** Money set aside: it leaves the running balance but is still yours. */
+      savingsBalance: "Saldo tabungan",
       income: "Pemasukan",
       expense: "Pengeluaran",
       netCashflow: "Arus kas bersih",
       budget: "Anggaran",
       savings: "Tabungan",
       debt: "Hutang",
-      receivable: "Piutang"
+      receivable: "Piutang",
+      installment: "Cicilan"
     }
   },
 
@@ -216,7 +230,15 @@ export const appConfigDefaults = {
       /** Roll unspent budget into the next period. */
       rolloverUnusedBudget: false,
       /** Create the matching cashflow entry when a saving contribution lands. */
-      mirrorSavingsToCashflow: true
+      mirrorSavingsToCashflow: true,
+      /**
+       * Paying a debt is money leaving the house and collecting a receivable is
+       * money arriving, so both belong in the summary. Without this the running
+       * balance drifts away from the real wallet.
+       */
+      mirrorDebtPaymentsToCashflow: true,
+      /** Every instalment paid is an expense under the bills category. */
+      mirrorInstallmentsToCashflow: true
     },
     reminders: [
       { id: "bill-due", label: "Tagihan jatuh tempo", enabled: true, daysBefore: 3, channel: "inApp" },
@@ -366,4 +388,25 @@ export function mergeConfig(base, override) {
   });
 
   return result;
+}
+
+/**
+ * Folds menu entries shipped after the family saved their own menu back in.
+ *
+ * `mergeConfig` replaces arrays wholesale — the right call for a menu an admin
+ * curated — but it also means a page added in a later release would be
+ * unreachable for anyone who ever touched the Navigation section. Entries the
+ * admin deleted on purpose are remembered in `removedItemIds`, so only genuinely
+ * new defaults are appended.
+ */
+export function resolveNavigation(section) {
+  const items = Array.isArray(section?.items) ? section.items : [];
+  const removed = new Set(section?.removedItemIds || []);
+  const present = new Set(items.map((item) => item.id));
+
+  const missing = appConfigDefaults.navigation.items.filter(
+    (item) => !present.has(item.id) && !removed.has(item.id),
+  );
+
+  return missing.length === 0 ? section : { ...section, items: [...items, ...missing] };
 }

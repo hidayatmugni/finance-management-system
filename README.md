@@ -37,11 +37,27 @@ Start here for complete information:
 - **Professional Charts**: Area, bar, pie charts with Recharts
 - **Export to Excel**: Download data for external analysis
 
-### 💰 Debt & Savings Management
+### 💰 Debt, Instalment & Savings Management
 - **Debt Tracking**: Track money owed with due dates & overdue alerts
 - **Receivables**: Track money others owe you
+- **Instalments (Cicilan)**: Principal + tenor in months, with an auto-generated
+  monthly schedule and next-payment reminder
 - **Savings Goals**: Set targets with progress tracking
 - **Payment Recording**: Log payments with history
+
+**Everything lands in the summary.** Paying a debt or an instalment is an
+expense, collecting a receivable is income, and a savings deposit is an expense
+that reappears as *saldo tabungan* on the dashboard. The running balance
+(*saldo berjalan*) therefore only ever holds day-to-day money — savings sit
+beside it, not inside it. Each mirror is a switch under
+**Konfigurasi → Alur kerja → Otomatisasi**:
+
+| Action | Recorded as | Category |
+| --- | --- | --- |
+| Bayar hutang | Pengeluaran | Lainnya |
+| Terima piutang | Pemasukan | Lainnya |
+| Setor cicilan | Pengeluaran | Tagihan |
+| Setor tabungan | Pengeluaran | Tabungan |
 
 ### 📱 Responsive Design
 - **Mobile First**: Optimized for all screen sizes
@@ -170,6 +186,13 @@ Copy `.env.example` to `.env` and configure Firebase credentials.
 
 npm run build
 ```
+
+`vercel.json` rewrites every request that is not a real file to `/index.html`.
+This app uses `createBrowserRouter`, so without that rewrite a deep link or a
+refresh on `/dashboard/installments` asks Vercel for a file that does not exist
+and returns 404 — routing only works when the SPA shell is served for all paths.
+Vercel checks the filesystem before applying rewrites, so `/assets/*`, `sw.js`
+and the manifest are still served as static files.
 
 ### Environment Variables
 

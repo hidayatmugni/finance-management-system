@@ -33,10 +33,17 @@ const SOURCES = [
   { key: "budgets", label: "Anggaran", collection: "budgets" },
   { key: "savingGoals", label: "Target tabungan", collection: "savingGoals" },
   { key: "savingContributions", label: "Setoran", collection: "savingContributions" },
-  { key: "financeRecords", label: "Hutang & piutang", collection: "financeRecords" },
+  { key: "financeRecords", label: "Hutang, piutang & cicilan", collection: "financeRecords" },
   { key: "financePayments", label: "Pembayaran", collection: "financePayments" },
   { key: "categories", label: "Kategori", collection: "categories" }
 ];
+
+/** Debts, receivables and instalments share one collection. */
+const RECORD_TYPE_LABELS = {
+  debt: "Hutang",
+  receivable: "Piutang",
+  installment: "Cicilan"
+};
 
 export function AdminDataPage() {
   const toast = useToast();
@@ -99,7 +106,7 @@ export function AdminDataPage() {
           return {
             ...base,
             label: item.personName,
-            detail: `${item.recordType === "debt" ? "Hutang" : "Piutang"} · ${item.description || "—"}`,
+            detail: `${RECORD_TYPE_LABELS[item.recordType] || "Catatan"} · ${item.description || "—"}`,
             amount: Number(item.amountInitial ?? item.amount ?? 0),
             date: toDateString(item.dueDate)
           };
